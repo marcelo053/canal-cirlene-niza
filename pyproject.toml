@@ -1,0 +1,42 @@
+[project]
+name = "cirleneniza"
+version = "0.1.0"
+description = "Canal Cirlene Niza - AI-powered health & wellness content pipeline"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Marcelo", email = "marcelo@example.com" }]
+dependencies = [
+    "crewai>=0.100.0",
+    "crewai-tools>=0.20.0",
+    "python-telegram-bot>=20.0",
+    "fal>=0.9.0",
+    "boto3>=1.34.0",
+    "loguru>=0.7.0",
+    "structlog>=24.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.0.0",
+    "httpx>=0.27.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["src.cirleneniza"]
+
+[tool.coverage.report]
+exclude = ["tests/*"]
