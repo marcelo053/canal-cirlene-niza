@@ -1,0 +1,13 @@
+Create a minimalist logo for "CN" initials in Georgia serif font style.
+
+Design requirements:
+- Letters: "CN" in elegant serif typeface (Georgia style)
+- Letter color: warm orange/amber #E07B39
+- Background: dark brown gradient #2C1810 to #4A2C2A
+- Effect: subtle drop shadow for depth
+- Style: classic, elegant, Mediterranean warmth
+- No extra elements — just the letters on dark background
+- High contrast, clean, professional
+
+The logo represents a health and wellness channel focused on nutrition,
+healthy habits, and scientific-backed advice. Female audience 25-45.

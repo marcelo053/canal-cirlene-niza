@@ -1,0 +1,11 @@
+Create a circular avatar logo combining a monogram with a badge element.
+
+Design requirements:
+- Main element: "CN" letters in Georgia serif font, color #E07B39
+- Background: dark brown gradient #2C1810 to #4A2C2A, circular shape
+- Badge element: small "NIZA" text in white/cream, positioned bottom-right
+- Badge style: rounded rectangle with #E07B39 background
+- Overall: professional, clean, instantly recognizable at small sizes
+- Square format with circular logo centered
+
+This is for YouTube channel cover and social media profiles.

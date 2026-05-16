@@ -1,0 +1,14 @@
+Create a YouTube thumbnail template for a health and wellness video.
+
+Template structure:
+- Split layout or full background image
+- Brand element: small "CN" monogram in top-left or top-right corner
+- Text area: large bold text for video title (not included in template)
+- Color accent: warm orange #E07B39 for highlights
+- Background: warm terracotta tones OR clean gradient dark brown
+- Style: professional, clean, high contrast for small screen visibility
+- No cluttered elements — minimal and impactful
+
+Two variants:
+1. Dark variant: #2C1810 background with orange accents
+2. Light variant: #FAF6F1 background with terracotta accents
