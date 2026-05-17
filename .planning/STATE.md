@@ -2,45 +2,50 @@
 
 ## Current Position
 
-- **Milestone**: v1.0 Pipeline Completo
-- **Phase**: 0 (Initialization complete, Phase 1 not started)
-- **Status**: Ready to begin Phase 1
-- **Last updated**: 2026-05-15T21:00:00.000Z
+- **Milestone**: v1.0 OpenClaw Pipeline
+- **Phase**: 1 — Infra & Credenciais (in progress)
+- **Status**: VPS infra done, aguardando HeyGen + Postiz + voz Cirlene
+- **Last updated**: 2026-05-17
 
-## Phase Progress
+## Architecture
 
-| Phase | Status | Plans Done | Notes |
-|-------|--------|-----------|-------|
-| 1 — Infra & Credenciais | Not Started | 0/3 | Awaiting API registrations |
-| 2 — Pipeline de Conteúdo | Not Started | 0/3 | Blocked on Phase 1 |
-| 3 — Workflow de Aprovação | Not Started | 0/3 | Blocked on Phase 2 |
-| 4 — Montagem & Formatos | Not Started | 0/2 | Blocked on Phase 3 |
-| 5 — Publicação Social | Not Started | 0/3 | Blocked on Phase 4 |
-| 6 — Dashboard & Monitoramento | Not Started | 0/2 | Blocked on Phase 5 |
+OpenClaw agent profile `cirlene` (port 18790) no VPS 186.202.209.88, isolado do FEM (port 18789).
+8 agentes: Roteirista → Narrador (clonev) → Avatar (HeyGen) → Criativo (evolink) → Montador (ffmpeg) → Publicador (postiz) → Analista.
+Aprovação via Streamlit :8503. Dashboard via Streamlit :8504.
 
-## Context Accumulated
+## Phase 1 — Infra & Credenciais (2026-05-17)
 
-- Canal: Cirlene Niza, nutrição e saúde
-- VPS: 186.202.209.88 (compartilhada com OpenClaw FEM)
-- OpenClaw FEM usa portas 8501 (aprovação) e 8502 (dashboard) — CIRL usará 8503 e 8504
-- Sufixo -cirl em todos os workflows n8n e tabelas Baserow
-- Referência técnica: /Documents/Brain/Openclaw Redesign/
+| Task | Status | Notas |
+|------|--------|-------|
+| 1 — OpenClaw cirlene profile :18790 | ✅ Done | systemd openclaw-cirlene.service |
+| 2 — Baserow 5 tabelas _cirlene | ✅ Done | DB 175, IDs no .env VPS |
+| 3 — MinIO 4 buckets cirlene-* | ✅ Done | lifecycle 90d em audio+arts |
+| 4 — Voz Cirlene (clonev sample) | ⏸ Blocked | Precisa URLs YouTube da Cirlene |
+| 5 — 8 skills instaladas (clawhub) | ✅ Done | clonev, heygen-avatar-lite, evolink-image/media, postiz, etc |
+| 6 — HeyGen API + avatar | ⏸ Blocked | Precisa conta HeyGen + foto Cirlene |
+| 7 — Postiz social accounts | ⏸ Blocked | Precisa OAuth TikTok + YouTube + Instagram |
+| 8 — Clone de voz (smoke test) | ⏸ Blocked | Depende task 4 |
+| 9–13, 15 — Skills SKILL.md (7) | ✅ Done | identidade, roteiro, narrador, avatar, criativo, montador, publicacao |
+| 14 — Streamlit Aprovação :8503 | ✅ Done | systemd cirlene-aprovacao.service |
+| 17 — Streamlit Dashboard :8504 | ✅ Done | systemd cirlene-dashboard.service |
+| 18 — Analista + systemd | ✅ Done | cirlene-analista skill + services enabled |
+| 16, 19 — E2E tests | ⏸ Blocked | Depende tasks 4, 6, 7 |
 
-## Key Blockers
+## Context
 
-- TikTok Content Posting API requer aprovação manual do app por parte do TikTok (pode levar dias)
-- YouTube OAuth requer browser flow (ação manual na VPS ou localmente)
-- Meta Graph API requer conta Business Instagram verificada
+- VPS: 186.202.209.88
+- OpenClaw cirlene profile: `/root/.openclaw-cirlene/`
+- Workspace: `/root/.openclaw-cirlene/workspace/canal-cirlene-niza/`
+- .env VPS: `/root/.openclaw-cirlene/workspace/canal-cirlene-niza/.env`
+- Baserow: DB 175, tabelas 720-725 (productions, scenes, posts, metrics, costs)
+- MinIO buckets: cirlene-audio, cirlene-arts, cirlene-avatar, cirlene-final
+- Streamlit aprovação: http://186.202.209.88:8503
+- Streamlit dashboard: http://186.202.209.88:8504
+- FEM isolado em :18789 (não tocado)
 
-## Next Step
+## Next Steps
 
-Run `/gsd:plan-phase 1` to create detailed plan for Phase 1 (Infra & Credenciais).
-
-## API Notes
-
-| API | Status | Blocker |
-|-----|--------|---------|
-| YouTube Data API v3 | Not registered | Precisa criar projeto no Google Cloud Console |
-| TikTok Content Posting API | Not registered | Precisa submeter app para review (1-5 dias) |
-| Meta Graph API | Not registered | Precisa conta Business + aprovação de permissões |
-| Telegram Bot | Not created | BotFather no Telegram |
+1. Fornecer URLs YouTube Cirlene → Task 4 (voz)
+2. Criar conta HeyGen + gerar avatar → Task 6
+3. Conectar redes sociais no Postiz → Task 7
+4. Após todas acima: Task 8 (smoke test voz) + Tasks 16/19 (E2E)
