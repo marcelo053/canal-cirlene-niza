@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str = Field(..., alias="TELEGRAM_BOT_TOKEN")
 
     # AI / LLM
-    gemini_api_key: str = Field(..., alias="GEMINI_API_KEY")
+    gemini_api_key: str = Field("", alias="GEMINI_API_KEY")
 
     # Fal.ai
     fal_api_key: str = Field(..., alias="FAL_API_KEY")
