@@ -40,6 +40,20 @@ class BaserowClient:
             json={"fields": fields}
         )
 
+    def create_row(self, table_id: int, fields: dict[str, Any]) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            f"/database/rows/table/{table_id}/?user_field_names=true",
+            json=fields,
+        )
+
+    def update_row(self, table_id: int, row_id: int, fields: dict[str, Any]) -> dict[str, Any]:
+        return self._request(
+            "PATCH",
+            f"/database/rows/table/{table_id}/{row_id}/?user_field_names=true",
+            json=fields,
+        )
+
     def get_style_guide(self, production_id: int) -> dict[str, Any] | None:
         """Get Visual Style Guide for a production from Baserow."""
         rows = self._request(

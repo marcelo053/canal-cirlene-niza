@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     baserow_url: str = Field("http://localhost:8000", alias="BASEROW_URL")
     baserow_token: str = Field(..., alias="BASEROW_TOKEN")
     baserow_database_id: str = Field(..., alias="BASEROW_DATABASE_ID")
+    baserow_table_productions: int = Field(726, alias="BASEROW_TABLE_PRODUCTIONS")
+    baserow_table_scenes: int = Field(727, alias="BASEROW_TABLE_SCENES")
+    baserow_table_posts: int = Field(728, alias="BASEROW_TABLE_POSTS")
+    baserow_table_metrics: int = Field(729, alias="BASEROW_TABLE_METRICS")
+    baserow_table_costs: int = Field(730, alias="BASEROW_TABLE_COSTS")
 
     # Kokoro TTS
     kokoro_endpoint: str = Field("http://localhost:5000", alias="KOKORO_ENDPOINT")

@@ -7,6 +7,7 @@ from cirleneniza.agents.diretor_arte import get_agent as get_diretor_arte
 from cirleneniza.agents.narrador import Narrador
 from cirleneniza.agents.editor_video import EditorVideo
 from cirleneniza.agents.editor_audio import EditorAudio
+from cirleneniza.agents.publicador import Publicador
 from loguru import logger
 
 
@@ -22,6 +23,7 @@ class VideoCrew:
         self.narrador = Narrador()
         self.editor_video = EditorVideo()
         self.editor_audio = EditorAudio()
+        self.publicador = Publicador()
         self.crew = None
 
     def build(self) -> Crew:
@@ -53,6 +55,24 @@ class VideoCrew:
             "result": result,
             "status": "completed",
         }
+
+    def publish(
+        self,
+        video_path: str,
+        production_id: int,
+        title: str,
+        description: str,
+        tags: str = "",
+    ) -> dict:
+        """Upload vídeo finalizado e enfileira para publicação nas plataformas."""
+        logger.info(f"VideoCrew: enfileirando publicação production_id={production_id}")
+        return self.publicador.execute(
+            video_path=video_path,
+            production_id=production_id,
+            title=title,
+            description=description,
+            tags=tags,
+        )
 
 
 def get_crew() -> Crew:
