@@ -42,7 +42,11 @@ class Settings(BaseSettings):
     baserow_table_metrics: int = Field(729, alias="BASEROW_TABLE_METRICS")
     baserow_table_costs: int = Field(730, alias="BASEROW_TABLE_COSTS")
 
-    # Kokoro TTS
+    # ElevenLabs (voz clonada Cirlene Niza)
+    elevenlabs_api_key: str = Field(..., alias="ELEVENLABS_API_KEY")
+    elevenlabs_voice_id: str = Field("Hjkdk1gQgapvWcOLaL1K", alias="ELEVENLABS_VOICE_ID")
+
+    # Kokoro TTS (fallback local)
     kokoro_endpoint: str = Field("http://localhost:5000", alias="KOKORO_ENDPOINT")
     kokoro_voice: str = Field("af_sarah", alias="KOKORO_VOICE")
 

@@ -13,8 +13,12 @@ def test_strip_stage_directions():
 
 
 def test_narrador_initialization():
+    from unittest.mock import MagicMock
+    from cirleneniza.tools.elevenlabs import ElevenLabsClient
+    mock_el = MagicMock(spec=ElevenLabsClient)
+    mock_el.voice_id = "test-voice-id"
     with patch("boto3.client"):
-        agente = Narrador()
+        agente = Narrador(elevenlabs=mock_el)
         assert agente.name == "Narrador"
         assert hasattr(agente, "generate_narration")
         assert hasattr(agente, "execute")
