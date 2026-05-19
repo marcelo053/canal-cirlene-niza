@@ -1,14 +1,12 @@
 import subprocess
 from loguru import logger
 from pathlib import Path
-from cirleneniza.tools.nca_toolkit import NCAToolkitClient
 
 
 class EditorAudio:
     """Agente Editor de Áudio — mixagem, limpeza, normalização."""
 
-    def __init__(self, nca: NCAToolkitClient | None = None):
-        self.nca = nca or NCAToolkitClient()
+    def __init__(self):
         self.name = "Editor de Áudio"
         self.role = (
             "Editor de áudio especializado em conteúdo de saúde. "
@@ -17,8 +15,21 @@ class EditorAudio:
         self.goal = "Entregar áudio final com qualidade profissional e loudness padrão."
 
     def normalize(self, audio_path: Path | str, target_lufs: float = -14.0) -> Path:
-        """Normalize audio to YouTube standard loudness."""
-        return self.nca.normalize_audio(audio_path, target_lufs)
+        """Normalize audio to YouTube standard loudness via ffmpeg loudnorm."""
+        audio_path = Path(audio_path)
+        output_path = audio_path.with_name(f"{audio_path.stem}_normalized{audio_path.suffix}")
+        cmd = [
+            "ffmpeg", "-y", "-i", str(audio_path),
+            "-af", f"loudnorm=I={target_lufs}:TP=-2:LRA=11",
+            "-ar", "44100",
+            str(output_path),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.error(f"loudnorm error: {result.stderr[-500:]}")
+            raise RuntimeError(f"ffmpeg loudnorm failed: {result.stderr[-200:]}")
+        logger.info(f"Audio normalized: {output_path} ({output_path.stat().st_size:,} bytes)")
+        return output_path
 
     def mix_with_music(
         self,
