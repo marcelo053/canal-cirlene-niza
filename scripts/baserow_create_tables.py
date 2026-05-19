@@ -104,6 +104,8 @@ def main():
                 {"name": "keywords",          "type": "text"},
                 {"name": "duracao_segundos",  "type": "number", "number_decimal_places": 0},
                 {"name": "video_final_url",   "type": "url"},
+                {"name": "thumbnail_url",     "type": "url"},
+                {"name": "heygen_video_id",   "type": "text"},
                 {"name": "created_at",        "type": "date", "date_include_time": True},
             ],
         },

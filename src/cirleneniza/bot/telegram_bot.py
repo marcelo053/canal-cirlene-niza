@@ -55,10 +55,13 @@ async def criar(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try:
         crew = VideoCrew()
         result = crew.run(topic)
+        video_line = f"\n🎥 Vídeo: {result['video_url']}" if result.get("video_url") else ""
+        thumb_line = f"\n🖼️ Thumb: {result['thumbnail_url']}" if result.get("thumbnail_url") else ""
         await update.message.reply_text(
             f"✅ *Produção completa!*\n\n"
             f"🎬 {result['topic']}\n"
-            f"📊 Status: {result['status']}",
+            f"🆔 production\\_id: {result.get('production_id', '—')}\n"
+            f"📊 Status: {result['status']}{video_line}{thumb_line}",
             parse_mode="Markdown",
         )
     except Exception as e:

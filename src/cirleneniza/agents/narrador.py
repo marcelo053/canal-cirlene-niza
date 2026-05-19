@@ -40,7 +40,16 @@ class Narrador:
             )
         self.elevenlabs = elevenlabs
         self.kokoro = kokoro or KokoroClient()
-        self.minio = minio or MinIOClient()
+        if minio is None:
+            cfg = get_settings()
+            minio = MinIOClient(
+                endpoint=cfg.minio_endpoint.removeprefix("http://"),
+                access_key=cfg.minio_access_key,
+                secret_key=cfg.minio_secret_key,
+                bucket_work=cfg.minio_bucket_work,
+                bucket_final=cfg.minio_bucket_final,
+            )
+        self.minio = minio
         self.name = "Narrador"
         self.role = (
             "Narrador profissional de vídeos de saúde e bem-estar. "

@@ -53,6 +53,13 @@ class Settings(BaseSettings):
     # NCA Toolkit
     nca_toolkit_url: str = Field("http://localhost:8080", alias="NCA_TOOLKIT_URL")
 
+    # HeyGen
+    heygen_api_key: str = Field(..., alias="HEYGEN_API_KEY")
+    heygen_talking_photo_id: str = Field(
+        "a8ea07fc852d43728dd94c9607d462aa",
+        alias="HEYGEN_TALKING_PHOTO_ID",
+    )
+
     # Logging
     log_level: str = Field("INFO", alias="LOG_LEVEL")
 

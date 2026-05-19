@@ -45,8 +45,9 @@ class NCAToolkitClient:
         audio_path = Path(audio_path)
         output_path = audio_path.with_name(f"{audio_path.stem}_normalized.wav")
 
+        mime = "audio/mpeg" if audio_path.suffix.lower() == ".mp3" else "audio/wav"
         with open(audio_path, "rb") as f:
-            files = {"audio": (audio_path.name, f, "audio/wav")}
+            files = {"audio": (audio_path.name, f, mime)}
             data = {"target_lufs": str(target_lufs)}
 
             response = requests.post(
