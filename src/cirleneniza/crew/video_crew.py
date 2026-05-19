@@ -68,6 +68,6 @@ class VideoCrew:
         )
 
 
-def get_crew() -> Crew:
+def get_crew() -> VideoCrew:
     """Factory for VideoCrew."""
-    return VideoCrew().build()
+    return VideoCrew()
