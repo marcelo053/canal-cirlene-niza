@@ -117,6 +117,10 @@ class VideoCrew:
             norm_key,
             7 * 24 * 3600,
         )
+        # presigned URL usa endpoint interno; substituir por IP público para HeyGen acessar
+        audio_url_for_heygen = audio_url_for_heygen.replace(
+            "localhost:9000", "186.202.209.88:9000"
+        ).replace("127.0.0.1:9000", "186.202.209.88:9000")
         logger.info(f"VideoCrew: áudio normalizado em MinIO → {audio_url_for_heygen}")
 
         # Fase 7: HeyGen avatar → download MP4
