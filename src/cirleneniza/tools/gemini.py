@@ -9,9 +9,8 @@ class GeminiClient:
 
     def __init__(self, model: str = "gemini-2.5-flash"):
         settings = get_settings()
-        genai.configure(api_key=settings.gemini_api_key)
         self.model = model
-        self.client = genai.Client()
+        self.client = genai.Client(api_key=settings.gemini_api_key)
 
     def generate(
         self,
