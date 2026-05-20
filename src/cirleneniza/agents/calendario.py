@@ -59,13 +59,14 @@ Idioma: portugues brasileiro."""
 
 {research}
 
-Forneca APENAS:
-1. Paleta de cores: 3-4 cores com hex (ex: azul #2A5285, verde #38A169)
-2. Tom visual: 1 frase (ex: "energetico e cientifico")
-3. Referencia visual: 1 frase (ex: "pessoas treinando, alimentos naturais")
-4. Composicao: 1 frase (ex: "close-up de maos e expressoes, fundos limpos")
+Responda EXATAMENTE neste formato (sem alteracoes, sem headers extras, sem markdown):
 
-MAXIMO 200 palavras total. Sem Headers, sem listas extensas, sem descricoes longas."""
+Paleta: [cor1 #hex], [cor2 #hex], [cor3 #hex], [cor4 #hex]
+Tom visual: [1 frase]
+Referencia visual: [1 frase]
+Composicao: [1 frase]
+
+PROIBIDO: nao use ## nem # nem * nem **. Nao acrescente secoes extras. Apenas as 4 linhas acima."""
         result = self.gemini.generate(prompt, temperature=0.6)
         return {"style_guide": result.strip()}
 
