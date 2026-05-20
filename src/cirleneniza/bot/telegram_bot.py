@@ -1,4 +1,5 @@
 import asyncio
+import signal
 import uuid
 import time
 import re
@@ -333,7 +334,7 @@ async def cmd_produzir(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text("Iniciando producao (pode levar 15-20 min)...")
 
     asyncio.create_task(
-        run_production_background(user_id, msg.message_id, update.effective_chat.id)
+        run_production_background(update.effective_chat.id, msg.message_id, user_id)
     )
 
 

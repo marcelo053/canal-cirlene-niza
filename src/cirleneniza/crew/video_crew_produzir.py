@@ -131,7 +131,6 @@ class ProduzirCrew:
 
         for v_url in video_urls:
             local_clip = Path(f"/tmp/cirlene_{production_id}_scene_{uuid.uuid4().hex[:6]}.mp4")
-            self.minio.download_file = self._download_url
             self._download_url(v_url, local_clip)
             all_videos.append(str(local_clip))
 
@@ -143,9 +142,13 @@ class ProduzirCrew:
             output=Path(f"/tmp/cirlene_{production_id}_final.mp4"),
         )
 
-        # === FASE 9: NCA Toolkit — legendas ===
-        logger.info("Fase 9: NCA Toolkit — gerando legendas")
-        srt_path = self.editor_video.generate_srt(str(norm_main))
+        # === FASE 9: NCA Toolkit — legendas (opcional) ===
+        srt_path = None
+        try:
+            logger.info("Fase 9: NCA Toolkit — gerando legendas")
+            srt_path = self.editor_video.generate_srt(str(norm_main))
+        except Exception as e:
+            logger.warning(f"Legendas NCA falharam (ignorando): {e}")
 
         # === FASE 10: Publicador ===
         logger.info("Fase 10: Publicador — publicando")
@@ -162,7 +165,10 @@ class ProduzirCrew:
         result["post_ids"] = pub_result.get("post_ids")
 
         # Cleanup
-        for p in [local_intro, local_outro, final_video, srt_path, norm_intro, norm_main, norm_outro]:
+        cleanup_paths = [local_intro, local_outro, final_video, norm_intro, norm_main, norm_outro]
+        if srt_path:
+            cleanup_paths.append(srt_path)
+        for p in cleanup_paths:
             try:
                 Path(p).unlink(missing_ok=True)
             except Exception:
