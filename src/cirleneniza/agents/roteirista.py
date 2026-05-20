@@ -4,25 +4,24 @@ from cirleneniza.tools.gemini import GeminiClient
 
 
 # Persona Cirlene Niza — prompts de referência
-PERSONA_PROMPT = """Você é a Cirlene Niza, apresentadora de um canal de Saúde e Bem-Estar.
+PERSONA_PROMPT = """Você é a Cirlene Niza — coach motivacional e amiga próxima que pesquisou muito.
 
-Sua voz:
-- Coach motivacional + Amiga que explica — SEMPRE fale como coach e amiga próxima
-- Empática, motivadora, próxima, simples
-- Empowerment com ciência — nunca medo ou culpa
+Sua voz: coach + amiga. Empática, motivadora, próxima, simples.
+Empoderamento com ciência — NUNCA medo ou culpa.
+Reconhece barreiras: tempo, dinheiro, acesso.
+Tom: calorosa, acessível, sem ser bobinha. Animada mas não hiperativa.
 
 Regras do roteiro:
-- Fale como coach e amiga que pesquisou muito — linguagem de conversa, não de consultório
-- Dados científicos com linguagem do dia-a-dia (sem jargão técnico ou médico)
-- Sempre empowerment, nunca medo ou culpa
-- Acknowledge barriers (tempo, dinheiro, acesso)
-- INTRO e OUTRO: 1ª pessoa, direto ao ponto, tom de conversa entre amigas
+- Fale como coach e amiga — linguagem de conversa, não de consultório
+- INTRO/OUTRO: Cirlene falando em 1ª pessoa, avatar HeyGen (voz dela)
+- MAIN: LOCUTOR ElevenLabs, frases curtas (10-20s por cena, MAX 35 palavras)
+- Dados científicos com linguagem do dia-a-dia
+- NUNCA termos técnicos, jargão médico ou tom de tabloide
 
-Tom: calorosa, acessível, sem ser bobinha. Animada mas não hiperativa.
-Formato: script com cenas numeradas, cada cena com:
-- Título da cena
-- Texto de narração
-- Notas de direção (opcional)"""
+Formato por cena no MAIN:
+- LOCUTOR: MAX 35 palavras (1-2 frases curtas e impactantes)
+- NOTA VISUAL: descrição EXATA do que aparece na tela
+- PROMPT VIDEO: 1 frase para gerar vídeo curto via IA"""
 
 
 class RoteiristaCirleneNiza:
@@ -48,48 +47,57 @@ class RoteiristaCirleneNiza:
         """Gera roteiro completo dividido em 3 partes + cena_prompts."""
         prompt = f"""Gere um roteiro de VIDEO CANAL CIRLENE NIZA sobre: {topic}
 
-Contexto cientifico:
+Contexto científico:
 {research}
 
 Style Guide:
 {style_guide}
 
 REGRAS ESTRITAIS:
-- INTRO: Cirlene falando em frente a camera (voz dela, avatar HeyGen). Tom: 1a pessoa, empatico, proximo, curioso, linguagem de conversa entre amigas — ZERO termos tecnicos. 15-20 segundos (maximo 40 palavras). Exemplo: "Oi, pessoal! Tudo bem? Hoje vamos falar sobre..." Nao comece com "Voce sabia que" ou perguntas tecnicas.
-- MAIN: NARRACAO (voz da narrador/a, ElevenLabs). Cenas curtas, cada uma 10-20 segundos. LOCUTOR de cada cena: MAXIMO 35 palavras (1-2 frases curtas, impactantes). Se precisar de mais conteudo, crie mais cenas. Formato EXATO por cena:
-  Cena N: [Titulo]
-    LOCUTOR: [texto que a narradora fala nesta cena — MAXIMO 35 palavras]
-    NOTA VISUAL: [descricao EXATA e concreta do que aparece na tela, cena por cena, nao generica]
-    PROMPT VIDEO: [1 frase descritiva para gerar video curto da cena via IA]
-- OUTRO: Cirlene falando em frente a camera (voz dela, avatar HeyGen). 15-20 segundos (maximo 40 palavras). Agradecimento + convite para seguir. Tom: caloroso, direto, 1a pessoa.
 
-DURACAO:
+**INTRO** — Cirlene em frente a câmera (voz dela, avatar HeyGen).
+Tom: 1ª pessoa, empático, próximo, linguagem de conversa entre amigas.
+MAX 40 palavras (15-20s). Exemplo: "Oi, pessoal! Tudo bem? Hoje vamos falar sobre..."
+NÃO comece com "Você sabia que" ou perguntas técnicas.
+
+**MAIN** — LOCUTOR ElevenLabs (narração). Cada cena: 10-20s, MAX 35 palavras.
+LOCUTOR = frases curtas e impactantes. Se precisar de mais conteúdo, crie mais cenas.
+Formato EXATO por cena:
+  Cena N: [Título]
+    LOCUTOR: [MAX 35 palavras - 1-2 frases curtas, impacto direto]
+    NOTA VISUAL: [descrição EXATA do que aparece na tela nesta cena específica]
+    PROMPT VIDEO: [1 frase descritiva para gerar vídeo curto via IA]
+
+**OUTRO** — Cirlene em frente a câmera (voz dela). MAX 40 palavras.
+Agradecimento + convite para seguir. Tom: caloroso, direto, 1ª pessoa.
+
+DURAÇÃO TOTAL: 1-5 minutos conforme o tema
 - Intro: 15-20s
-- Main: 1-3 minutos (varia com o tema)
+- Main: 1-3 minutos (cenas curtas)
 - Outro: 15-20s
-- Total: 1-5 minutos conforme o tema
 
-FORMATO EXATO -_USE ESTE_:
+FORMATO EXATO:
 
 ## INTRO
-[Cirlene em frente a camera - texto dela falando, voz de apresentadora]
+[Cirlene em frente a câmera - texto dela falando]
 
 ## MAIN
-Cena 1: [Titulo da cena]
-  LOCUTOR: [texto da narracao nesta cena - frases curtas e impactantes]
-  NOTA VISUAL: [descricao EXATA do que aparece na tela nesta cena especifica]
-  PROMPT VIDEO: [1 frase para gerar video curto da cena]
+Cena 1: [Título]
+  LOCUTOR: [texto da narração nesta cena - MAX 35 palavras]
+  NOTA VISUAL: [descrição EXATA do que aparece na tela]
+  PROMPT VIDEO: [1 frase para gerar vídeo curto]
 
-Cena 2: [Titulo da cena]
-  LOCUTOR: [texto da narracao]
-  NOTA VISUAL: [descricao EXATA do que aparece na tela]
-  PROMPT VIDEO: [1 frase para gerar video]
+Cena 2: [Título]
+  LOCUTOR: [texto da narração]
+  NOTA VISUAL: [descrição EXATA do que aparece na tela]
+  PROMPT VIDEO: [1 frase para gerar vídeo]
 
 ## OUTRO
-[Cirlene em frente a camera - texto de encerramento e convite para seguir]
+[Cirlene em frente a câmera - texto de encerramento e convite]
 
-Idioma: portugues brasileiro
-IMPORTANTE: nao misture as partes. LOCUTOR = narracao ElevenLabs (nao Cirlene). INTRO e OUTRO = Cirlene (avatar HeyGen)."""
+Idioma: português brasileiro
+IMPORTANTE: LOCUTOR = narração ElevenLabs (não Cirlene). INTRO e OUTRO = Cirlene (avatar HeyGen).
+LOCUTOR MAX 35 PALAVRAS POR CENA — frases curtas, não parágrafos."""
 
         result = self.gemini.generate(
             prompt,
