@@ -117,3 +117,66 @@ class EditorVideo:
             "video_path": str(video_path),
             "status": "composed",
         }
+
+    def compose_from_segments(
+        self,
+        video_paths: list[str],
+        main_audio: str,
+        srt_path: Path | str | None = None,
+        output: Path | str | None = None,
+        strip_avatar_audio: bool = True,
+    ) -> Path:
+        """Concatenate video segments and overlay main audio as primary track.
+
+        Args:
+            video_paths: list of video files (intro + scene clips + outro)
+            main_audio: full narration audio that plays over ALL segments
+            srt_path: optional subtitles file
+            output: output path
+            strip_avatar_audio: if True, strip audio from intro/outro clips so main_audio
+                                 is the only audio track throughout the video
+        """
+        if not video_paths:
+            raise ValueError("No video paths provided")
+
+        if output is None:
+            output = Path("/tmp/final_video.mp4")
+        output = Path(output)
+        output.parent.mkdir(parents=True, exist_ok=True)
+
+        concat_list = output.parent / "segments.txt"
+        with open(concat_list, "w") as f:
+            for vp in video_paths:
+                f.write(f"file '{Path(vp).resolve()}'\n")
+
+        if strip_avatar_audio:
+            cmd = [
+                "ffmpeg", "-y",
+                "-f", "concat", "-safe", "0",
+                "-i", str(concat_list),
+                "-i", str(main_audio),
+            ]
+        else:
+            cmd = [
+                "ffmpeg", "-y",
+                "-f", "concat", "-safe", "0",
+                "-i", str(concat_list),
+                "-i", str(main_audio),
+            ]
+
+        if srt_path:
+            cmd.extend(["-vf", f"subtitles={Path(srt_path).resolve()}"])
+
+        cmd.extend([
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-shortest",
+            str(output),
+        ])
+
+        run_ffmpeg(cmd)
+        concat_list.unlink(missing_ok=True)
+        logger.info(f"EditorVideo: composed {len(video_paths)} segments with main_audio overlay → {output}")
+        return output

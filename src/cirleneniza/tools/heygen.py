@@ -11,11 +11,34 @@ class HeyGenClient:
 
     def __init__(self, api_key: str, talking_photo_id: str):
         self.talking_photo_id = talking_photo_id
+        self.api_key = api_key
         self.session = requests.Session()
         self.session.headers.update({"X-Api-Key": api_key})
 
-    def generate_video(self, audio_url: str) -> str:
+    def upload_audio(self, audio_path: Path | str) -> str:
+        """Upload audio to HeyGen to generate word-timing metadata. Returns asset_id."""
+        audio_path = Path(audio_path)
+        with open(audio_path, "rb") as f:
+            resp = requests.post(
+                f"{self.BASE_URL}/v3/assets",
+                headers={"X-Api-Key": self.api_key},
+                files={"file": (audio_path.name, f)},
+                timeout=120,
+            )
+        resp.raise_for_status()
+        asset_id = resp.json()["data"]["asset_id"]
+        logger.info(f"HeyGen: audio uploaded → asset_id={asset_id}")
+        return asset_id
+
+    def generate_video(self, audio_asset_id: str | None = None, audio_url: str | None = None) -> str:
         """Submit video generation job. Returns video_id."""
+        if audio_asset_id:
+            voice = {"type": "audio", "audio_asset_id": audio_asset_id}
+        elif audio_url:
+            voice = {"type": "audio", "audio_url": audio_url}
+        else:
+            raise ValueError("Must provide either audio_asset_id or audio_url")
+
         payload = {
             "video_inputs": [
                 {
@@ -23,10 +46,7 @@ class HeyGenClient:
                         "type": "talking_photo",
                         "talking_photo_id": self.talking_photo_id,
                     },
-                    "voice": {
-                        "type": "audio",
-                        "audio_url": audio_url,
-                    },
+                    "voice": voice,
                 }
             ],
             "dimension": {"width": 1080, "height": 1920},
@@ -40,8 +60,8 @@ class HeyGenClient:
     def wait_for_completion(
         self,
         video_id: str,
-        timeout: int = 600,
-        poll_interval: int = 15,
+        timeout: int = 1800,
+        poll_interval: int = 30,
     ) -> str:
         """Poll until video is ready. Returns video URL."""
         deadline = time.time() + timeout

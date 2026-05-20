@@ -3,6 +3,24 @@ from loguru import logger
 from cirleneniza.tools.gemini import GeminiClient
 
 
+import signal
+from contextlib import contextmanager
+from loguru import logger
+
+
+@contextmanager
+def _timeout(seconds: int):
+    def handler(signum, frame):
+        raise TimeoutError(f"Timed out after {seconds}s")
+    old = signal.signal(signal.SIGALRM, handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old)
+
+
 class CalendarioEditorial:
     """Agente Calendário Editorial — pesquisa científica e Style Guide."""
 
@@ -22,33 +40,34 @@ class CalendarioEditorial:
         self.goal = "Fornecer contexto científico sólido e Visual Style Guide para o Roteirista."
 
     def research_topic(self, topic: str) -> dict:
-        """Pesquisa científica sobre o tema."""
+        """Pesquisa científica sobre o tema — output limpo, sem formatação."""
         prompt = f"""Pesquise sobre: {topic}
 
-Forneça:
-1. 3-5 pontos-chave científicos sobre o tema
-2. Fontes reais (estudos, artigos) — pode usar fontes genéricas se não souber específicas
-3. Dados numéricos relevantes (quantidades, percentages, prazos)
+Forneca em formato de lista numerada (sem Headers, sem marcadores de cena, sem timestamps):
+1. ate 5 pontos cientificos-chave sobre o tema
+2. Dados numericos relevantes se houver
+3. Uma frase de contexto geral
 
-Idioma: português brasileiro."""
+Seja direto, factual, baseado em ciencia.
+Idioma: portugues brasileiro."""
         result = self.gemini.generate(prompt, temperature=0.5)
-        return {"topic": topic, "research": result}
+        return {"topic": topic, "research": result.strip()}
 
     def generate_style_guide(self, topic: str, research: str) -> dict:
-        """Gera Visual Style Guide para o tema."""
-        prompt = f"""Com base na pesquisa sobre "{topic}":
+        """Gera Visual Style Guide conciso — apenas paletas e referencias."""
+        prompt = f"""Com base no tema "{topic}" e pesquisa:
 
 {research}
 
-Gere um Visual Style Guide com:
-1. Paleta de cores sugerida (hex codes)
-2. Tom visual (explicação de 1-2 frases)
-3. Referências visuais (ex: "fotos de alimentos naturais", "pessoas em movimento")
-4. Composição recomendada (close-up, wide, etc.)
+Forneca APENAS:
+1. Paleta de cores: 3-4 cores com hex (ex: azul #2A5285, verde #38A169)
+2. Tom visual: 1 frase (ex: "energetico e cientifico")
+3. Referencia visual: 1 frase (ex: "pessoas treinando, alimentos naturais")
+4. Composicao: 1 frase (ex: "close-up de maos e expressoes, fundos limpos")
 
-Idioma: português brasileiro."""
+MAXIMO 200 palavras total. Sem Headers, sem listas extensas, sem descricoes longas."""
         result = self.gemini.generate(prompt, temperature=0.6)
-        return {"style_guide": result}
+        return {"style_guide": result.strip()}
 
     def execute(self, topic: str) -> dict:
         """Executa pesquisa + Style Guide."""

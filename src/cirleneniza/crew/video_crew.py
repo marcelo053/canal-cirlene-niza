@@ -123,8 +123,9 @@ class VideoCrew:
         ).replace("127.0.0.1:9000", "186.202.209.88:9000")
         logger.info(f"VideoCrew: áudio normalizado em MinIO → {audio_url_for_heygen}")
 
-        # Fase 7: HeyGen avatar → download MP4
-        video_id = self.heygen.generate_video(audio_url=audio_url_for_heygen)
+        # Fase 7: HeyGen avatar → upload + download MP4
+        audio_asset_id = self.heygen.upload_audio(normalized_path)
+        video_id = self.heygen.generate_video(audio_asset_id=audio_asset_id)
         logger.info(f"VideoCrew: HeyGen job submetido → video_id={video_id}")
 
         self.baserow.update_row(cfg.baserow_table_productions, production_id, {
