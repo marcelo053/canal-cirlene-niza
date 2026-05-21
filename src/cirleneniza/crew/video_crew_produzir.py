@@ -53,7 +53,7 @@ class ProduzirCrew:
         if not production_id:
             prod_row = self.baserow.create_row(self._cfg.baserow_table_productions, {
                 "title": topic,
-                "status": "producao",
+                "status": "em_producao",
             })
             production_id = prod_row["id"]
             session["production_id"] = production_id
