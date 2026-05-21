@@ -118,23 +118,44 @@ class EditorVideo:
             "status": "composed",
         }
 
+    def _normalize_segment(
+        self,
+        video_path: Path,
+        output: Path,
+        width: int = 1920,
+        height: int = 1080,
+        fps: int = 25,
+    ) -> Path:
+        """Scale, pad and set fps on a single video clip to a standard resolution."""
+        cmd = [
+            "ffmpeg", "-y", "-i", str(video_path),
+            "-vf", (
+                f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+                f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black,"
+                f"fps={fps},setsar=1"
+            ),
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-an",
+            str(output),
+        ]
+        run_ffmpeg(cmd)
+        return output
+
     def compose_from_segments(
         self,
         video_paths: list[str],
         main_audio: str,
         srt_path: Path | str | None = None,
         output: Path | str | None = None,
-        strip_avatar_audio: bool = True,
+        width: int = 1920,
+        height: int = 1080,
+        fps: int = 25,
     ) -> Path:
-        """Concatenate video segments and overlay main audio as primary track.
+        """Normalize all segments to same resolution/fps, concat, overlay main audio.
 
-        Args:
-            video_paths: list of video files (intro + scene clips + outro)
-            main_audio: full narration audio that plays over ALL segments
-            srt_path: optional subtitles file
-            output: output path
-            strip_avatar_audio: if True, strip audio from intro/outro clips so main_audio
-                                 is the only audio track throughout the video
+        Pre-processing each clip avoids FFmpeg concat demuxer failures when
+        input files have different resolutions or frame rates (e.g. HeyGen
+        portrait vs Kling square clips).
         """
         if not video_paths:
             raise ValueError("No video paths provided")
@@ -144,39 +165,54 @@ class EditorVideo:
         output = Path(output)
         output.parent.mkdir(parents=True, exist_ok=True)
 
-        concat_list = output.parent / "segments.txt"
+        # Step 1 — normalize each segment to target resolution/fps
+        normalized = []
+        for i, vp in enumerate(video_paths):
+            norm_out = output.parent / f"_norm_{i}_{output.stem}.mp4"
+            logger.info(f"EditorVideo: normalizing segment {i+1}/{len(video_paths)}: {Path(vp).name}")
+            self._normalize_segment(Path(vp), norm_out, width, height, fps)
+            normalized.append(norm_out)
+
+        # Step 2 — concat normalized segments
+        concat_list = output.parent / f"_concat_{output.stem}.txt"
         with open(concat_list, "w") as f:
-            for vp in video_paths:
-                f.write(f"file '{Path(vp).resolve()}'\n")
+            for np in normalized:
+                f.write(f"file '{np.resolve()}'\n")
 
-        if strip_avatar_audio:
-            cmd = [
-                "ffmpeg", "-y",
-                "-f", "concat", "-safe", "0",
-                "-i", str(concat_list),
-                "-i", str(main_audio),
-            ]
-        else:
-            cmd = [
-                "ffmpeg", "-y",
-                "-f", "concat", "-safe", "0",
-                "-i", str(concat_list),
-                "-i", str(main_audio),
-            ]
-
-        if srt_path:
-            cmd.extend(["-vf", f"subtitles={Path(srt_path).resolve()}"])
-
-        cmd.extend([
-            "-c:v", "libx264", "-pix_fmt", "yuv420p",
-            "-movflags", "+faststart",
-            "-map", "0:v:0",
-            "-map", "1:a:0",
-            "-shortest",
-            str(output),
+        concat_out = output.parent / f"_concat_{output.stem}.mp4"
+        run_ffmpeg([
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0",
+            "-i", str(concat_list),
+            "-c", "copy",
+            str(concat_out),
         ])
 
+        # Step 3 — overlay main audio
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", str(concat_out),
+            "-i", str(main_audio),
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-movflags", "+faststart",
+            "-shortest",
+        ]
+        if srt_path:
+            cmd[-1:-1] = ["-vf", f"subtitles={Path(srt_path).resolve()}"]
+            cmd[cmd.index("-c:v")] = "-c:v"
+            cmd[cmd.index("copy", cmd.index("-c:v"))] = "libx264"
+
+        cmd.append(str(output))
         run_ffmpeg(cmd)
+
+        # Cleanup temp files
+        for np in normalized:
+            np.unlink(missing_ok=True)
         concat_list.unlink(missing_ok=True)
-        logger.info(f"EditorVideo: composed {len(video_paths)} segments with main_audio overlay → {output}")
+        concat_out.unlink(missing_ok=True)
+
+        logger.info(f"EditorVideo: composed {len(video_paths)} segments → {output}")
         return output
