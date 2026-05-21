@@ -54,7 +54,7 @@ class FalClient:
                 "image_url": image_url,
                 "duration": str(duration),
             },
-            timeout=300,
+            client_timeout=300,
         )
         video_url = result["video"]["url"]
         logger.info(f"FalClient: video generated → {video_url}")
