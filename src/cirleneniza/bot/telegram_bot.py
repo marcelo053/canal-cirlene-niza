@@ -354,14 +354,41 @@ async def run_production_background(chat_id: int, reply_to: int, user_id: int):
         crew = ProduzirCrew()
         result = crew.run(session)
 
+        video_url = result.get("video_url", "")
+        thumbnail_url = session.get("thumbnail_url", "")
+        production_id = result.get("production_id", "-")
+
         await bot.edit_message_text(
-            f"[OK] Producao concluida\n\n"
-            f"Video: {result.get('video_url', '-')}\n"
-            f"Thumbnail: {session.get('thumbnail_url', '-')}\n"
-            f"ID: {result.get('production_id', '-')}",
+            f"[OK] Producao concluida — ID: {production_id}\nEnviando video...",
             chat_id=chat_id,
             message_id=reply_to,
         )
+
+        # Send thumbnail
+        if thumbnail_url:
+            try:
+                await bot.send_photo(chat_id=chat_id, photo=thumbnail_url, caption="Thumbnail")
+            except Exception as e:
+                logger.warning(f"Nao enviou thumbnail: {e}")
+
+        # Send video
+        if video_url:
+            try:
+                await bot.send_video(
+                    chat_id=chat_id,
+                    video=video_url,
+                    caption=f"Video: {session.get('topic', '')}\nID: {production_id}",
+                    supports_streaming=True,
+                )
+            except Exception as thumb_e:
+                logger.warning(f"send_video falhou ({thumb_e}), enviando link")
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text=f"[OK] Video pronto:\n{video_url}",
+                )
+        else:
+            await bot.send_message(chat_id=chat_id, text="[AVISO] Video URL nao disponivel.")
+
     except Exception as e:
         logger.error(f"Erro producao: {e}")
         await bot.edit_message_text(
