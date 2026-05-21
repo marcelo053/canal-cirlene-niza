@@ -47,18 +47,19 @@ class FalClient:
         duration: int = 5,
     ) -> dict:
         """Generate video from image using kling-video i2v."""
+        valid_duration = "10" if duration > 5 else "5"
         result = fal_client.subscribe(
             model,
             arguments={
                 "prompt": prompt,
                 "image_url": image_url,
-                "duration": str(duration),
+                "duration": valid_duration,
             },
             client_timeout=300,
         )
         video_url = result["video"]["url"]
         logger.info(f"FalClient: video generated → {video_url}")
-        return {"url": video_url, "duration": duration}
+        return {"url": video_url, "duration": int(valid_duration)}
 
     def generate_scene_videos(
         self,
