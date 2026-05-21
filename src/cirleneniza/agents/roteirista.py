@@ -251,20 +251,31 @@ Retorna o roteiro completo com 3 partes."""
         return self._parse_script(result)
 
     def generate_thumbnail_prompts(self, topic: str, style_guide: str) -> list[str]:
-        """Gera prompts de thumbnail para o Diretor de Arte."""
-        prompt = f"""Gere 2 prompts de thumbnail para um vídeo sobre: {topic}
+        """Gera prompts de thumbnail para o Diretor de Arte — formato Flux-compatível em inglês."""
+        prompt = f"""Generate 2 image generation prompts for a YouTube thumbnail about: {topic}
 
-Style Guide: {style_guide}
+RULES (mandatory):
+- Write in ENGLISH only
+- Describe ONLY visual elements — no text, no titles, no words in the image
+- Be concrete and specific: describe food, ingredients, colors, lighting, composition
+- Style: photorealistic, warm lighting, professional food photography or lifestyle photo
+- Color palette: warm terracotta tones, orange accents (#E07B39), clean background
+- NO cartoon faces, NO people faces, NO abstract shapes, NO random objects
+- FORMAT: return exactly 2 prompts, each on its own line, no numbering, no labels, no blank lines
 
-Cada prompt deve:
-- Ser detalhado e descritivo
-- Incluir referência à paleta de cores
-- Descrever a composição (texto, imagem, layout)
-- Ser em português para fal.ai
+Example for "banana pancake recipe":
+Fluffy golden banana pancakes stacked on a rustic wooden plate, fresh banana slices on top, warm honey dripping, soft morning light, food photography style, warm terracotta background, appetizing and inviting
+Close-up of ripe bananas and oat flour on a kitchen counter, warm orange tones, natural daylight, clean minimal composition, healthy fitness lifestyle aesthetic
 
-Output: lista de 2 prompts, um por thumbnail."""
-        result = self.gemini.generate(prompt, temperature=0.7)
-        prompts = [line.strip() for line in result.split("\n") if line.strip()]
+Now generate 2 prompts for: {topic}"""
+        result = self.gemini.generate(prompt, temperature=0.6)
+        # pega linhas não-vazias que parecem prompts reais (>30 chars)
+        prompts = [
+            line.strip()
+            for line in result.strip().split("\n")
+            if line.strip() and len(line.strip()) > 30
+            and not line.strip().startswith(("#", "-", "*", "1.", "2.", "Prompt"))
+        ]
         return prompts[:2]
 
     def execute(self, topic: str, research: str, style_guide: str) -> dict:

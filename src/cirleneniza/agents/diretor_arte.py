@@ -45,13 +45,26 @@ class DiretorDeArte:
 
     def generate_thumbnail(self, topic: str, prompt_override: str | None = None) -> dict:
         """Gera thumbnail para vídeo específico."""
-        if prompt_override:
-            prompt = prompt_override
+        if prompt_override and len(prompt_override.strip()) > 30:
+            # prompt concreto do roteirista — enriquecer com estilo visual fixo
+            prompt = (
+                f"{prompt_override.strip()}, "
+                "warm terracotta color palette, orange accent tones, "
+                "professional photography, sharp focus, vibrant, high contrast, "
+                "no text, no words, no letters, no captions"
+            )
         else:
-            base = load_prompt("thumbnail_template")
-            prompt = f"{base}\n\nTopic: {topic}\n\nAdapt the template to this video topic."
-        logger.info(f"Diretor de Arte: gerando thumbnail para {topic}")
-        result = self.fal.generate(prompt, model="fal-ai/flux/dev", aspect_ratio="16:9")
+            # fallback: prompt genérico baseado no tópico
+            prompt = (
+                f"Professional YouTube thumbnail photo about {topic}, "
+                "food photography or lifestyle photography style, "
+                "warm terracotta and orange color palette (#E07B39 accents), "
+                "clean background, sharp focus, high contrast, inviting and vibrant, "
+                "no text, no words, no letters, no captions, photorealistic"
+            )
+        logger.info(f"Diretor de Arte: gerando thumbnail para '{topic}'")
+        logger.debug(f"Thumbnail prompt: {prompt[:120]}...")
+        result = self.fal.generate(prompt, model="fal-ai/flux/schnell", aspect_ratio="16:9")
         return {"thumbnail_url": result["images"][0]["url"], "topic": topic}
 
     def execute(self, task: str, context: dict | None = None) -> dict:
