@@ -14,6 +14,7 @@ class MinIOClient:
         secret_key: str = "minioadmin",
         bucket_work: str = "openclaw-work",
         bucket_final: str = "openclaw-final",
+        public_endpoint: str | None = None,
     ):
         self.s3 = boto3.client(
             "s3",
@@ -24,6 +25,9 @@ class MinIOClient:
         )
         self.bucket_work = bucket_work
         self.bucket_final = bucket_final
+        # public_endpoint used to rewrite presigned URLs for external access
+        self._internal_endpoint = endpoint
+        self._public_endpoint = public_endpoint or endpoint
 
     def upload_file(
         self,
@@ -44,10 +48,16 @@ class MinIOClient:
         return dest
 
     def generate_presigned_url(self, bucket: str, key: str, expires_in: int = 3600) -> str:
-        """Generate presigned URL for sharing."""
+        """Generate presigned URL for sharing. Rewrites to public endpoint if configured."""
         url = self.s3.generate_presigned_url(
             "get_object",
             Params={"Bucket": bucket, "Key": key},
             ExpiresIn=expires_in,
         )
+        # Replace internal host with public host so external clients can access
+        if self._internal_endpoint != self._public_endpoint:
+            url = url.replace(
+                f"http://{self._internal_endpoint}",
+                f"http://{self._public_endpoint}",
+            )
         return url

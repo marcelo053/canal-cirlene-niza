@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     # MinIO
     minio_endpoint: str = Field("http://localhost:9000", alias="MINIO_ENDPOINT")
+    minio_public_endpoint: str = Field("", alias="MINIO_PUBLIC_ENDPOINT")
     minio_access_key: str = Field(..., alias="MINIO_ACCESS_KEY")
     minio_secret_key: str = Field(..., alias="MINIO_SECRET_KEY")
     minio_bucket_work: str = Field("canal-cirlene-niza-work", alias="MINIO_BUCKET_WORK")

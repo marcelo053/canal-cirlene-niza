@@ -48,6 +48,7 @@ class Narrador:
                 secret_key=cfg.minio_secret_key,
                 bucket_work=cfg.minio_bucket_work,
                 bucket_final=cfg.minio_bucket_final,
+                public_endpoint=cfg.minio_public_endpoint or None,
             )
         self.minio = minio
         self.name = "Narrador"

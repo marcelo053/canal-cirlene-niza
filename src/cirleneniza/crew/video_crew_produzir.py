@@ -31,6 +31,7 @@ class ProduzirCrew:
             secret_key=cfg.minio_secret_key,
             bucket_work=cfg.minio_bucket_work,
             bucket_final=cfg.minio_bucket_final,
+            public_endpoint=cfg.minio_public_endpoint or None,
         )
         self.heygen = HeyGenClient(
             api_key=cfg.heygen_api_key,
