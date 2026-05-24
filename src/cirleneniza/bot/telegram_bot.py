@@ -434,8 +434,6 @@ def run_bot():
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
-if __name__ == "__main__":
-    run_bot()
 # ---------------------------------------------------------------------------
 # Natural language handler
 # ---------------------------------------------------------------------------
@@ -612,3 +610,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     else:
         await typing_msg.edit_text(reply or "Como posso ajudar com o canal?")
+
+
+if __name__ == "__main__":
+    run_bot()
