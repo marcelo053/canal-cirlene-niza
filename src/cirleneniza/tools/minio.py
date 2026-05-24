@@ -16,9 +16,13 @@ class MinIOClient:
         bucket_final: str = "openclaw-final",
         public_endpoint: str | None = None,
     ):
+        def _strip_scheme(url: str) -> str:
+            return url.removeprefix("https://").removeprefix("http://")
+
+        clean_endpoint = _strip_scheme(endpoint)
         self.s3 = boto3.client(
             "s3",
-            endpoint_url=f"http://{endpoint}",
+            endpoint_url=f"http://{clean_endpoint}",
             aws_access_key_id=access_key,
             aws_secret_access_key=secret_key,
             config=Config(signature_version="s3v4"),
@@ -26,8 +30,8 @@ class MinIOClient:
         self.bucket_work = bucket_work
         self.bucket_final = bucket_final
         # public_endpoint used to rewrite presigned URLs for external access
-        self._internal_endpoint = endpoint
-        self._public_endpoint = public_endpoint or endpoint
+        self._internal_endpoint = clean_endpoint
+        self._public_endpoint = _strip_scheme(public_endpoint) if public_endpoint else clean_endpoint
 
     def upload_file(
         self,
