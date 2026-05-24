@@ -1,13 +1,13 @@
 from crewai import Agent
 from loguru import logger
-from cirleneniza.tools.gemini import GeminiClient
+from cirleneniza.tools.minimax import MiniMaxClient
 
 
 class RevisorEspecialista:
     """Agente Revisor Especialista — valida precisão científica dos roteiros."""
 
-    def __init__(self, gemini: GeminiClient | None = None):
-        self.gemini = gemini or GeminiClient()
+    def __init__(self, gemini: MiniMaxClient | None = None):
+        self.gemini = gemini or MiniMaxClient()
         self.name = "Revisor Especialista"
         self.role = (
             "Revisor científico especialista em saúde e nutrição. "

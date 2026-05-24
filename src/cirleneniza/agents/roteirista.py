@@ -1,6 +1,6 @@
 from crewai import Agent
 from loguru import logger
-from cirleneniza.tools.gemini import GeminiClient
+from cirleneniza.tools.minimax import MiniMaxClient
 
 
 # Persona Cirlene Niza — prompts de referência
@@ -28,7 +28,7 @@ class RoteiristaCirleneNiza:
     """Agente Roteirista — scripts no estilo Cirlene Niza."""
 
     def __init__(self):
-        self.gemini = GeminiClient()
+        self.gemini = MiniMaxClient()
         self.name = "Roteirista"
         self.role = (
             "Escritor de roteiros para vídeos de saúde e bem-estar. "

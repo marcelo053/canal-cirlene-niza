@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     # AI / LLM
     gemini_api_key: str = Field("", alias="GEMINI_API_KEY")
+    minimax_api_key: str = Field("", alias="MINIMAX_API_KEY")
 
     # Fal.ai
     fal_api_key: str = Field(..., alias="FAL_API_KEY")

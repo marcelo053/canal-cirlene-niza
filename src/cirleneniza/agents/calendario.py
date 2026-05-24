@@ -1,6 +1,6 @@
 from crewai import Agent
 from loguru import logger
-from cirleneniza.tools.gemini import GeminiClient
+from cirleneniza.tools.minimax import MiniMaxClient
 
 
 import signal
@@ -24,8 +24,8 @@ def _timeout(seconds: int):
 class CalendarioEditorial:
     """Agente Calendário Editorial — pesquisa científica e Style Guide."""
 
-    def __init__(self, gemini: "GeminiClient | None" = None):
-        self.gemini = gemini if gemini is not None else GeminiClient()
+    def __init__(self, gemini: "MiniMaxClient | None" = None):
+        self.gemini = gemini if gemini is not None else MiniMaxClient()
         self.name = "Calendário Editorial"
         self.role = (
             "Pesquisador de saúde e bem-estar. "
