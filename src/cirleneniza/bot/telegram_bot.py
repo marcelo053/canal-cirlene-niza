@@ -429,9 +429,186 @@ def run_bot():
     app.add_handler(CommandHandler("produzir", cmd_produzir))
     app.add_handler(CommandHandler("status", cmd_status))
 
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     logger.info("Telegram bot iniciado")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
     run_bot()
+# ---------------------------------------------------------------------------
+# Natural language handler
+# ---------------------------------------------------------------------------
+from cirleneniza.bot.natural_router import NaturalLanguageRouter
+
+_router = NaturalLanguageRouter()
+
+
+async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Route free-text messages to the correct handler via MiniMax intent detection."""
+    if not update.message or not update.message.text:
+        return
+
+    user_id = update.effective_user.id
+    session = _s(user_id)
+    text = update.message.text.strip()
+
+    typing_msg = await update.message.reply_text("...")
+
+    try:
+        result = _router.route(text, session)
+    except Exception as e:
+        logger.error(f"NLRouter error: {e}")
+        await typing_msg.edit_text("Erro interno. Tente novamente ou use /ajuda.")
+        return
+
+    intent = result.get("intent", "conversa")
+    params = result.get("params", {})
+    reply = result.get("reply", "")
+
+    logger.info(f"NL intent={intent} params={params} user={user_id}")
+
+    if intent == "novo_tema":
+        topic = params.get("topic", "").strip()
+        if not topic:
+            await typing_msg.edit_text("Qual o tema do video?")
+            return
+        await typing_msg.edit_text(f"Iniciando: {topic}...")
+        session["topic"] = topic
+        session["step"] = "Pesquisando..."
+        try:
+            calendario = CalendarioEditorial()
+            cal_result = calendario.execute(topic)
+            session["research"] = cal_result["research"]
+            session["style_guide"] = cal_result["style_guide"]
+            session["step"] = "tema_ok"
+            await typing_msg.edit_text(
+                f"Tema pesquisado: {topic}\n\n"
+                f"Research:\n{_t(cal_result['research'], 400)}\n\n"
+                f"Me diga quando quer gerar o roteiro."
+            )
+        except Exception as e:
+            await typing_msg.edit_text(f"Erro ao pesquisar tema: {e}")
+
+    elif intent == "gerar_roteiro":
+        if not session.get("research"):
+            await typing_msg.edit_text("Primeiro me diz o tema do video.")
+            return
+        await typing_msg.edit_text("Gerando roteiro com MiniMax...")
+        try:
+            roteirista = RoteiristaCirleneNiza()
+            sd = roteirista.execute(
+                topic=session["topic"],
+                research=session["research"],
+                style_guide=session["style_guide"],
+            )
+            revisor = RevisorEspecialista()
+            rev = revisor.execute(sd["full_script"])
+            session["script_data"] = sd
+            session["step"] = "roteiro_ok"
+            await typing_msg.edit_text(
+                f"Roteiro pronto! Revisao: {rev.get('status', '-')}\n\n"
+                f"INTRO:\n{_t(sd.get('intro',''), 400)}\n\n"
+                f"Quer corrigir algo ou posso gerar o thumbnail?"
+            )
+        except Exception as e:
+            await typing_msg.edit_text(f"Erro ao gerar roteiro: {e}")
+
+    elif intent == "ver_roteiro":
+        if not session.get("script_data"):
+            await typing_msg.edit_text("Roteiro ainda nao gerado. Quer que eu gere agora?")
+            return
+        sd = session["script_data"]
+        await typing_msg.edit_text(f"INTRO:\n{_t(sd.get('intro',''), 500)}")
+        await update.message.reply_text(f"MAIN:\n{_t(sd.get('main',''), 800)}")
+        await update.message.reply_text(f"OUTRO:\n{_t(sd.get('outro',''), 500)}")
+
+    elif intent == "corrigir":
+        if not session.get("script_data"):
+            await typing_msg.edit_text("Nenhum roteiro para corrigir ainda.")
+            return
+        instrucao = params.get("instrucao", text)
+        await typing_msg.edit_text(f"Corrigindo: {instrucao}...")
+        try:
+            roteirista = RoteiristaCirleneNiza()
+            step = "all"
+            if "intro" in instrucao.lower():
+                step = "intro"
+            elif "main" in instrucao.lower() or "cena" in instrucao.lower():
+                step = "main"
+            elif "outro" in instrucao.lower():
+                step = "outro"
+            corrected = roteirista.apply_correction(
+                current=session["script_data"],
+                correction=instrucao,
+                step=step,
+            )
+            session["script_data"] = corrected
+            await typing_msg.edit_text(
+                f"Correcao aplicada ({step}).\n\n"
+                f"INTRO:\n{_t(corrected.get('intro',''), 400)}"
+            )
+        except Exception as e:
+            await typing_msg.edit_text(f"Erro: {e}")
+
+    elif intent == "gerar_thumbnail":
+        if not session.get("script_data"):
+            await typing_msg.edit_text("Preciso do roteiro antes. Quer que eu gere?")
+            return
+        await typing_msg.edit_text("Gerando thumbnail...")
+        try:
+            director = DiretorDeArte()
+            thumb_result = director.execute(
+                task="thumbnail",
+                context={
+                    "topic": session["topic"],
+                    "thumbnail_prompt": (session["script_data"].get("thumbnail_prompts") or [None])[0],
+                },
+            )
+            session["thumbnail_url"] = thumb_result.get("thumbnail_url")
+            session["step"] = "thumbnail_ok"
+            await typing_msg.edit_text("Thumbnail gerado!")
+            await update.message.reply_photo(thumb_result.get("thumbnail_url"))
+        except Exception as e:
+            await typing_msg.edit_text(f"Erro: {e}")
+
+    elif intent == "thumbnail_novo":
+        if not session.get("script_data"):
+            await typing_msg.edit_text("Gere o roteiro primeiro.")
+            return
+        ajuste = params.get("ajuste", "")
+        base_prompt = (session["script_data"].get("thumbnail_prompts") or [""])[0]
+        prompt_final = f"{base_prompt} {ajuste}".strip()
+        await typing_msg.edit_text("Gerando novo thumbnail...")
+        try:
+            director = DiretorDeArte()
+            thumb_result = director.execute(
+                task="thumbnail",
+                context={"topic": session["topic"], "thumbnail_prompt": prompt_final},
+            )
+            session["thumbnail_url"] = thumb_result.get("thumbnail_url")
+            await typing_msg.edit_text("Novo thumbnail!")
+            await update.message.reply_photo(thumb_result.get("thumbnail_url"))
+        except Exception as e:
+            await typing_msg.edit_text(f"Erro: {e}")
+
+    elif intent == "produzir":
+        if not session.get("script_data"):
+            await typing_msg.edit_text("Falta roteiro ainda. Quer que eu gere agora?")
+            return
+        await typing_msg.edit_text("Iniciando producao (15-20 min)...")
+        asyncio.create_task(
+            run_production_background(update.effective_chat.id, typing_msg.message_id, user_id)
+        )
+
+    elif intent == "status":
+        step = session.get("step", "inicio")
+        topic = session.get("topic", "-")
+        await typing_msg.edit_text(
+            f"Status:\nTema: {topic}\nEtapa: {step}\n"
+            f"Roteiro: {'OK' if session.get('script_data') else 'FALTA'}\n"
+            f"Thumbnail: {'OK' if session.get('thumbnail_url') else 'FALTA'}"
+        )
+
+    else:
+        await typing_msg.edit_text(reply or "Como posso ajudar com o canal?")
