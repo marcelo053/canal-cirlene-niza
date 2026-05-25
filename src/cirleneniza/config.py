@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     # HeyGen
     heygen_api_key: str = Field(..., alias="HEYGEN_API_KEY")
     heygen_talking_photo_id: str = Field(
-        "a8ea07fc852d43728dd94c9607d462aa",
+        "441217f024324f6a9be926c70bd50a32",
         alias="HEYGEN_TALKING_PHOTO_ID",
     )
 
