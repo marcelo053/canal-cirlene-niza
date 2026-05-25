@@ -21,16 +21,24 @@ class ElevenLabsClient:
         model_id: str = "eleven_multilingual_v2",
         stability: float = 0.5,
         similarity_boost: float = 0.75,
+        style: float = 0.0,
     ) -> Path:
-        """Converte texto em áudio MP3 com voz clonada."""
+        """Converte texto em áudio MP3 com voz clonada.
+
+        stability 0.35 = mais expressivo. similarity_boost 0.80 = mantém identidade da voz.
+        style 0.0-1.0 amplifica estilo original (eleven_multilingual_v2 apenas).
+        """
         url = f"{self.BASE_URL}/text-to-speech/{self.voice_id}"
+        voice_settings: dict = {
+            "stability": stability,
+            "similarity_boost": similarity_boost,
+        }
+        if style > 0.0:
+            voice_settings["style"] = style
         payload = {
             "text": text,
             "model_id": model_id,
-            "voice_settings": {
-                "stability": stability,
-                "similarity_boost": similarity_boost,
-            },
+            "voice_settings": voice_settings,
         }
         resp = self.session.post(url, json=payload, headers={"Accept": "audio/mpeg"})
         resp.raise_for_status()

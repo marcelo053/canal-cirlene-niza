@@ -15,12 +15,27 @@ STAGE_DIRECTION_PATTERNS = [
 
 
 def strip_stage_directions(text: str) -> str:
-    """Remove stage directions from script text before TTS."""
+    """Remove stage directions, preserve ellipses and natural pause markers."""
     result = text
     for pattern in STAGE_DIRECTION_PATTERNS:
         result = re.sub(pattern, "", result)
     result = re.sub(r"\s+", " ", result).strip()
     return result
+
+
+def prepare_for_tts(text: str) -> str:
+    """Prepare script text for ElevenLabs — strip directions, enhance pause markers.
+
+    ElevenLabs eleven_multilingual_v2 treats '...' as a natural pause.
+    Commas and sentence breaks also create breathing room.
+    We normalize spacing without collapsing intentional '...' pauses.
+    """
+    text = strip_stage_directions(text)
+    # Normalize multiple dots to exactly three (pause marker)
+    text = re.sub(r"\.{4,}", "...", text)
+    # Ensure space after ellipsis if missing
+    text = re.sub(r"\.\.\.([A-Za-záéíóúâêîôûãõàèìòùçÁÉÍÓÚÂÊÎÔÛÃÕÀÈÌÒÙÇ])", r"... \1", text)
+    return text.strip()
 
 
 class Narrador:
@@ -64,7 +79,7 @@ class Narrador:
         output_dir: Path | str | None = None,
     ) -> dict:
         """Converte script em áudio MP3 via ElevenLabs voz clonada."""
-        clean_text = strip_stage_directions(script)
+        clean_text = prepare_for_tts(script)
 
         output_path = None
         if output_dir:
@@ -72,7 +87,16 @@ class Narrador:
             output_dir.mkdir(parents=True, exist_ok=True)
             output_path = output_dir / "narration.mp3"
 
-        audio_path = self.elevenlabs.synthesize(clean_text, output_path)
+        # stability=0.35 → mais expressiva, variação natural de entonação
+        # similarity_boost=0.80 → mantém identidade da voz clonada
+        # style=0.45 → exagera estilo da voz original (ElevenLabs v2 param)
+        audio_path = self.elevenlabs.synthesize(
+            clean_text,
+            output_path,
+            stability=0.35,
+            similarity_boost=0.80,
+            style=0.45,
+        )
 
         return {
             "audio_path": str(audio_path),

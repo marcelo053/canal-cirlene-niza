@@ -34,51 +34,69 @@ Style Guide:
 - NÃO comece com "Você sabia que" ou perguntas técnicas
 
 **MAIN** — narração ElevenLabs. Cada cena: MAX 35 palavras, 10-20s.
+MÍNIMO OBRIGATÓRIO: 6 cenas. Ideal: 7-8 cenas.
 Formato EXATO por cena (use exatamente estes marcadores):
 
 ##Cena N: [Título]##
 HOOK: [myth_break | immediate_benefit | counter_intuitive | mirror_question] (SOMENTE NA CENA 1, vazio nas demais)
-LOCUTOR: [MAX 35 palavras — 1-2 frases curtas, impacto direto]
+LOCUTOR: [MAX 35 palavras — veja regras de naturalidade abaixo]
 CAMERA: [tipo: close-up / medium-shot / wide-shot] + [movimento: static / slow-zoom-in / slow-pan-right / slow-pan-left / handheld]
 KLING PROMPT: [Camera movement]. [Subject described precisely]. [Action/movement]. [Environment]. [Lighting]. [Atmosphere]. Vertical 9:16. Photorealistic.
 NOTA VISUAL: [descrição concreta do que aparece na tela]
 LIGHTING: [soft natural light | golden hour | studio warm | outdoor bright]
 ATMOSPHERE: [warm | energetic | calm | inspiring | cozy]
 
-**KLING PROMPT deve seguir CSMEA em inglês:**
-Camera (C): tipo e movimento da câmera
-Subject (S): sujeito principal descrito com precisão
-Movement (M): ação/movimento acontecendo
-Environment (E): ambiente/cenário
-Atmosphere (A): lighting + mood
+**NATURALIDADE DO LOCUTOR — regras obrigatórias:**
+- Use `...` para pausas dramáticas antes de dados impactantes (ex: "Em apenas... 30 dias.")
+- 1 cena no MEIO deve ter CTA orgânico integrado: "salva esse vídeo", "manda pra quem precisa ver"
+- 1 cena deve ter pergunta reflexiva ao público: "você já sabia disso?", "faz sentido pra você?"
+- Varie o ritmo: alterne cenas curtas (1 frase) com cenas de 2 frases
+- Interjeições permitidas: "Olha só.", "Sabe o que é incrível?", "E o melhor:"
+- NUNCA soe como manual técnico — soe como amiga contando descoberta importante
+
+**KLING PROMPT deve seguir CSMEA em inglês com movimento obrigatório:**
+Camera (C): tipo e movimento da câmera — SEMPRE inclua movimento (never "static" sozinho)
+Subject (S): sujeito principal descrito com precisão visual
+Movement (M): ação acontecendo — alimentos, líquidos, partículas SEMPRE em movimento
+Environment (E): ambiente/cenário com detalhes de profundidade
+Atmosphere (A): lighting + mood específicos
 
 **OUTRO** — Cirlene em frente a câmera. MAX 40 palavras.
 Agradecimento + convite para seguir. Tom: caloroso, 1ª pessoa.
 
-DURAÇÃO: 1-3 minutos
+DURAÇÃO: 2-3 minutos
 - Intro: 15-20s
-- Main: 45s-2min (3-6 cenas)
+- Main: 90s-2min (6-8 cenas)
 - Outro: 15-20s
 
-## EXEMPLO DE CENA CORRETA
+## EXEMPLO DE CENAS CORRETAS (siga este padrão exato)
 
-##Cena 1: O segredo que ninguém conta##
+##Cena 1: O mito que te sabota##
 HOOK: myth_break
-LOCUTOR: Todo mundo diz que proteína engorda. A ciência mostra o oposto — ela acelera o metabolismo e preserva o músculo.
+LOCUTOR: Todo mundo diz que proteína engorda. A ciência prova o contrário... e muda tudo o que você pensava sobre emagrecer.
 CAMERA: close-up + slow-zoom-in
-KLING PROMPT: Close-up shot, slow zoom in. Fresh whey protein powder pouring into a glass shaker. Powder dissolving in clear water with swirling motion. Bright white kitchen counter, morning light. Soft natural light, warm golden tones. Inspiring, empowering atmosphere. Vertical 9:16. Photorealistic.
-NOTA VISUAL: Pó de whey caindo em coqueteleira com água cristalina, partículas se dissolvendo.
+KLING PROMPT: Extreme close-up shot, slow zoom in. Whey protein powder falling in slow motion into a glass shaker filled with clear water. Powder cloud swirling and dissolving in beautiful spirals. Bright modern kitchen counter, soft morning light streaming through window. Warm golden tones, clean aesthetic. Inspiring, empowering atmosphere. Vertical 9:16. Photorealistic.
+NOTA VISUAL: Pó de whey caindo em câmera lenta em coqueteleira, nuvem se dissolvendo em espirais.
 LIGHTING: soft natural light
 ATMOSPHERE: inspiring
 
-##Cena 2: Absorção rápida##
+##Cena 2: Absorção que surpreende##
 HOOK:
-LOCUTOR: Seu corpo absorve o whey em 30 a 60 minutos. Por isso ele age exatamente quando o músculo mais precisa.
-CAMERA: medium-shot + static
-KLING PROMPT: Medium shot, static camera. Digital timer showing 30 to 60 minutes counting down. Animated nutrient particles flowing into a muscular arm. Clean white background with soft green accents. Studio warm lighting. Calm, scientific atmosphere. Vertical 9:16. Photorealistic.
-NOTA VISUAL: Cronômetro animado 30-60 min com nutrientes fluindo para o músculo.
+LOCUTOR: Em... 30 minutos. É o tempo que leva para o whey chegar ao músculo. Nenhum outro alimento age tão rápido.
+CAMERA: medium-shot + slow-pan-right
+KLING PROMPT: Medium shot, slow pan right. Close-up of a stopwatch ticking, hands moving in real time. Glowing nutrient particles flowing from the watch face into a muscular forearm with veins subtly visible. Dark background with warm amber spot lighting. Energetic, scientific atmosphere. Vertical 9:16. Photorealistic.
+NOTA VISUAL: Cronômetro marcando tempo com partículas luminosas fluindo para o músculo.
 LIGHTING: studio warm
-ATMOSPHERE: calm
+ATMOSPHERE: energetic
+
+##Cena 4: Salva esse vídeo##
+HOOK:
+LOCUTOR: Salva esse vídeo — porque a maioria das pessoas descobre isso só depois de meses perdendo resultado por falta de proteína.
+CAMERA: wide-shot + slow-zoom-in
+KLING PROMPT: Wide shot, slow zoom in. Healthy meal prep containers arranged on a clean kitchen counter, colorful vegetables and protein foods visible. Woman's hands arranging containers with care. Warm afternoon light through kitchen window. Cozy, organized, motivating atmosphere. Vertical 9:16. Photorealistic.
+NOTA VISUAL: Marmitas organizadas com refeições coloridas e saudáveis na bancada da cozinha.
+LIGHTING: golden hour
+ATMOSPHERE: warm
 
 ## FORMATO DE SAÍDA
 

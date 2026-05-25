@@ -150,8 +150,20 @@ async def cmd_validar_roteiro(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     cena_prompts = sd.get("cena_prompts", [])
     if cena_prompts:
-        cenas_text = "\n".join([f"- {c['scene']}: {_t(c['prompt'], 80)}" for c in cena_prompts])
-        await update.message.reply_text(f"Cenas ({len(cena_prompts)}):\n{cenas_text}")
+        for i, c in enumerate(cena_prompts, 1):
+            hook_line = f"HOOK: {c.get('hook_technique', '')}\n" if c.get("hook_technique") else ""
+            cam_line = f"CAM: {c.get('camera', '-')}\n" if c.get("camera") else ""
+            light_line = f"LIGHT: {c.get('lighting', '-')} | ATM: {c.get('atmosphere', '-')}\n" if c.get("lighting") else ""
+            kling = c.get("kling_motion_prompt") or c.get("prompt", "")
+            cena_msg = (
+                f"\U0001f3ac Cena {i}: {c.get('scene', '')}\n"
+                + hook_line
+                + f"LOCUTOR: {_t(c.get('locutor', ''), 120)}\n"
+                + cam_line
+                + light_line
+                + f"KLING: {_t(kling, 220)}"
+            )
+            await update.message.reply_text(cena_msg)
 
 
 async def cmd_gerar_roteiro(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -195,8 +207,27 @@ async def cmd_gerar_roteiro(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
 
         await update.message.reply_text(f"INTRO:\n\n{_t(sd.get('intro', ''), 500)}")
-        await update.message.reply_text(f"MAIN:\n\n{_t(sd.get('main', ''), 800)}")
+        await update.message.reply_text(f"MAIN:\n\n{_t(sd.get('main', ''), 1500)}")
         await update.message.reply_text(f"OUTRO:\n\n{_t(sd.get('outro', ''), 500)}")
+
+        cena_prompts_gerar = sd.get("cena_prompts", [])
+        if cena_prompts_gerar:
+            await update.message.reply_text(f"--- KLING PROMPTS ({len(cena_prompts_gerar)} cenas) ---")
+            for i, c in enumerate(cena_prompts_gerar, 1):
+                hook_line = f"HOOK: {c.get('hook_technique', '')}\n" if c.get("hook_technique") else ""
+                cam_line = f"CAM: {c.get('camera', '-')}\n" if c.get("camera") else ""
+                light_line = f"LIGHT: {c.get('lighting', '-')} | ATM: {c.get('atmosphere', '-')}\n" if c.get("lighting") else ""
+                kling = c.get("kling_motion_prompt") or c.get("prompt", "")
+                cena_msg = (
+                    f"Cena {i}: {c.get('scene', '')}\n"
+                    + hook_line
+                    + f"LOCUTOR: {_t(c.get('locutor', ''), 120)}\n"
+                    + cam_line
+                    + light_line
+                    + f"KLING: {kling}"
+                )
+                await update.message.reply_text(cena_msg)
+
         await update.message.reply_text(
             "Correcoes? Use /corrigir [instrucao]  ex: /corrigir intro muito longa",
         )
