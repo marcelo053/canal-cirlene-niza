@@ -15,6 +15,23 @@ from cirleneniza.tools.baserow import BaserowClient
 from cirleneniza.config import get_settings
 
 
+
+def _extract_locutor_lines(main_section: str) -> str:
+    """Extract only LOCUTOR narration lines from MAIN section for ElevenLabs TTS.
+
+    The MAIN section contains structured fields (HOOK, CAMERA, KLING PROMPT, etc.)
+    that must NOT be sent to TTS. This extracts only the actual narration text.
+    """
+    lines = []
+    for line in main_section.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("LOCUTOR:"):
+            text = stripped.replace("LOCUTOR:", "").strip()
+            if text:
+                lines.append(text)
+    return " ".join(lines)
+
+
 class ProduzirCrew:
     """Pipeline de produção — fases 4-10 após aprovação."""
 
@@ -68,7 +85,8 @@ class ProduzirCrew:
         # === FASE 4: Narrador — 3 áudios separados ===
         logger.info("Fase 4: Narrador — gerando áudios")
         audio_intro = self.narrador.execute(sd["intro"], production_id)
-        audio_main = self.narrador.execute(sd["main"], production_id)
+        main_narration = _extract_locutor_lines(sd.get("main", ""))
+        audio_main = self.narrador.execute(main_narration, production_id)
         audio_outro = self.narrador.execute(sd["outro"], production_id)
 
         main_duration = audio_main.get("duration_estimate_sec", 120)
