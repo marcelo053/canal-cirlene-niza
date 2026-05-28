@@ -5,6 +5,7 @@ from loguru import logger
 from cirleneniza.agents.narrador import Narrador
 from cirleneniza.agents.editor_audio import EditorAudio
 from cirleneniza.agents.gerador_cenas import GeradorCenas
+from cirleneniza.agents.gerador_prompts import GeradorDePrompts
 from cirleneniza.agents.editor_video import EditorVideo
 from cirleneniza.agents.publicador import Publicador
 from cirleneniza.tools.heygen import HeyGenClient
@@ -40,6 +41,7 @@ class ProduzirCrew:
         self.narrador = Narrador()
         self.editor_audio = EditorAudio()
         self.gerador_cenas = GeradorCenas()
+        self.gerador_prompts = GeradorDePrompts()
         self.editor_video = EditorVideo(nca=NCAToolkitClient(cfg.nca_toolkit_url))
         self.publicador = Publicador()
         self.minio = MinIOClient(
@@ -108,8 +110,13 @@ class ProduzirCrew:
             "outro": str(norm_outro),
         }
 
+        # === FASE 5.5: GeradorDePrompts — enriquece cena_prompts com Kling 3.0 CSMEA ===
+        logger.info("Fase 5.5: GeradorDePrompts — enriquecendo KLING PROMPTS")
+        raw_cena_prompts = sd.get("cena_prompts", [])
+        cena_prompts_enriched = self.gerador_prompts.enrich(raw_cena_prompts) if raw_cena_prompts else []
+
         # === FASE 6: GeradorCenas — gera imagens e vídeos das cenas ===
-        cena_prompts = sd.get("cena_prompts", [])
+        cena_prompts = cena_prompts_enriched
         style_context = session.get("style_guide", "")[:500]
 
         logger.info(f"Fase 6: GeradorCenas — gerando {len(cena_prompts)} cenas")
