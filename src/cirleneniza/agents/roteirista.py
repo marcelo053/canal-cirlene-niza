@@ -1,7 +1,19 @@
 from crewai import Agent
 from loguru import logger
+import re
 from cirleneniza.tools.minimax import MiniMaxClient
 
+
+
+def _sanitize(text: str) -> str:
+    """Remove CJK/non-Portuguese unicode artifacts from MiniMax M2.7 output."""
+    cleaned = re.sub(
+        r"[\u3000-\u9fff\u3040-\u30ff\uf900-\ufaff\ufe30-\ufe4f]+",
+        "",
+        text,
+    )
+    cleaned = re.sub(r"  +", " ", cleaned)
+    return cleaned.strip()
 
 # Persona Cirlene Niza
 PERSONA_PROMPT = """Você é a Cirlene Niza — coach motivacional e amiga próxima que pesquisou muito.
@@ -173,6 +185,10 @@ class RoteiristaCirleneNiza:
                 outro = "\n".join(buffer).strip()
 
         cena_prompts = self._extract_cena_prompts(main)
+
+        intro = _sanitize(intro)
+        main = _sanitize(main)
+        outro = _sanitize(outro)
 
         return {
             "intro": intro,
