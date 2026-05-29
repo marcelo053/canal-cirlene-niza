@@ -54,6 +54,7 @@ class Settings(BaseSettings):
 
     # NCA Toolkit
     nca_toolkit_url: str = Field("http://localhost:8080", alias="NCA_TOOLKIT_URL")
+    nca_api_key: str = Field("", alias="NCA_API_KEY")
 
     # HeyGen
     heygen_api_key: str = Field(..., alias="HEYGEN_API_KEY")

@@ -42,7 +42,7 @@ class ProduzirCrew:
         self.editor_audio = EditorAudio()
         self.gerador_cenas = GeradorCenas()
         self.gerador_prompts = GeradorDePrompts()
-        self.editor_video = EditorVideo(nca=NCAToolkitClient(cfg.nca_toolkit_url))
+        self.editor_video = EditorVideo(nca=NCAToolkitClient(cfg.nca_toolkit_url, api_key=cfg.nca_api_key))
         self.publicador = Publicador()
         self.minio = MinIOClient(
             endpoint=cfg.minio_endpoint.removeprefix("http://"),
@@ -171,8 +171,18 @@ class ProduzirCrew:
         # === FASE 9: NCA Toolkit — legendas (opcional) ===
         srt_path = None
         try:
-            logger.info("Fase 9: NCA Toolkit — gerando legendas")
-            srt_path = self.editor_video.generate_srt(str(norm_main))
+            logger.info("Fase 9: NCA Toolkit — gerando legendas via URL MinIO")
+            # NCA Toolkit requires public URL (not local path)
+            audio_minio_key = f"productions/{production_id}/main_narration.mp3"
+            self.minio.upload_file(str(norm_main), audio_minio_key, bucket=self.minio.bucket_work)
+            audio_public_url = self.minio.generate_presigned_url(self.minio.bucket_work, audio_minio_key)
+            from cirleneniza.tools.nca_toolkit import NCAToolkitClient as _NCA
+            nca = _NCA(self._cfg.nca_toolkit_url, api_key=self._cfg.nca_api_key)
+            srt_text = nca.generate_captions_srt(audio_public_url, language="pt")
+            if srt_text:
+                srt_path = Path(f"/tmp/cirlene_{production_id}_main.srt")
+                srt_path.write_text(srt_text, encoding="utf-8")
+                logger.info(f"Fase 9: SRT gerado → {srt_path} ({len(srt_text)} chars)")
         except Exception as e:
             logger.warning(f"Legendas NCA falharam (ignorando): {e}")
 
