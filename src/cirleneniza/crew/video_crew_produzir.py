@@ -118,7 +118,7 @@ class ProduzirCrew:
         # Concat full narration audio: intro + main + outro
         combined_audio = self._concat_audio(
             [norm_intro, norm_main, norm_outro],
-            output=Path(f"/tmp/cirlene_{production_id}_audio_full.mp3"),
+            output=Path(f"/tmp/cirlene_{production_id}_audio_full.m4a"),
         )
         result["combined_audio"] = str(combined_audio)
 
