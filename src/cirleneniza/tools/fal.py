@@ -1,3 +1,4 @@
+import re
 import os
 import fal_client
 from loguru import logger
@@ -11,6 +12,35 @@ _ASPECT_SIZES = {
     "1:1":  {"width": 1024, "height": 1024},
     "4:5":  {"width": 820, "height": 1024},
 }
+
+# Terms that trigger fal.ai Kling content policy — replace with safe alternatives
+_CONTENT_POLICY_SUBS = [
+    # Medical body visualization (most specific first to avoid double-replace)
+    (r"translucent human silhouette[\w\s]*(body\s*)?(structure)?", "abstract energy flow visualization"),
+    (r"human (body\s*)?silhouette", "abstract silhouette"),
+    (r"body structure", "energy structure"),
+    (r"(glowing\s+)?neural pathways?(\s*(branching|flowing|reconnecting|throughout))?", "light pathways"),
+    (r"hormonal particles?", "luminous particles"),
+    (r"medical visualization", "scientific visualization"),
+    (r"anatomical", "abstract"),
+    # Obesity / body weight — specific multi-word FIRST, then standalone
+    (r"visceral fat", "internal tissue"),
+    (r"adipose tissue", "body tissue"),
+    (r"fat cells?", "body cells"),
+    (r"\bobese\b(\s*(person|body|figure|woman|man))?", "person"),
+    (r"\boverweight\b(\s*(person|body|figure|woman|man))?", "person"),
+    (r"\bbody fat\b", "body composition"),
+]
+
+
+def _sanitize_kling_prompt(prompt: str) -> str:
+    """Remove/replace terms that trigger fal.ai content policy violations."""
+    result = prompt
+    for pattern, replacement in _CONTENT_POLICY_SUBS:
+        result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+    # Collapse multiple spaces left by substitutions
+    result = re.sub(r"  +", " ", result)
+    return result
 
 
 class FalClient:
@@ -59,20 +89,31 @@ class FalClient:
     ) -> dict:
         """Generate video from image using Kling i2v.
 
+        Retries once with sanitized prompt on content_policy_violation (422).
         aspect_ratio: '9:16' for vertical (TikTok/Reels/Shorts default).
         duration: 5 or 10 seconds.
         """
         valid_duration = "10" if duration > 5 else "5"
-        result = fal_client.subscribe(
-            model,
-            arguments={
-                "prompt": prompt,
-                "image_url": image_url,
-                "duration": valid_duration,
-                "aspect_ratio": aspect_ratio,
-            },
-            client_timeout=300,
-        )
+        args = {
+            "prompt": prompt,
+            "image_url": image_url,
+            "duration": valid_duration,
+            "aspect_ratio": aspect_ratio,
+        }
+        try:
+            result = fal_client.subscribe(model, arguments=args, client_timeout=300)
+        except Exception as e:
+            if "content_policy_violation" in str(e) or "422" in str(e):
+                safe_prompt = _sanitize_kling_prompt(prompt)
+                logger.warning(
+                    f"FalClient: content_policy_violation — retrying with sanitized prompt. "
+                    f"Original len={len(prompt)}, safe len={len(safe_prompt)}"
+                )
+                args["prompt"] = safe_prompt
+                result = fal_client.subscribe(model, arguments=args, client_timeout=300)
+            else:
+                raise
+
         video_url = result["video"]["url"]
         logger.info(f"FalClient: video {aspect_ratio} {valid_duration}s -> {video_url}")
         return {"url": video_url, "duration": int(valid_duration)}
