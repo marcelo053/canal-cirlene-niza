@@ -12,6 +12,7 @@ from cirleneniza.agents.editor_audio import EditorAudio
 from cirleneniza.agents.publicador import Publicador
 from cirleneniza.config import get_settings
 from cirleneniza.tools.baserow import BaserowClient
+from cirleneniza.tools.cost_tracker import CostTracker
 from cirleneniza.tools.heygen import HeyGenClient
 from cirleneniza.tools.minio import MinIOClient
 
@@ -32,6 +33,7 @@ class VideoCrew:
             base_url=cfg.baserow_url,
             token=cfg.baserow_token,
         )
+        self.tracker = CostTracker(self.baserow, cfg.baserow_table_costs)
         self.minio = MinIOClient(
             endpoint=cfg.minio_endpoint.removeprefix("http://"),
             access_key=cfg.minio_access_key,
@@ -85,6 +87,7 @@ class VideoCrew:
             "roteiro": rot_result["script"],
             "status": "em_producao",
         })
+        self.tracker.log_elevenlabs(production_id, len(rot_result["script"]), "narração principal")
 
         # Fase 5: Thumbnail fal.ai
         thumbnail_prompts = rot_result.get("thumbnail_prompts", [])
@@ -100,6 +103,7 @@ class VideoCrew:
         self.baserow.update_row(cfg.baserow_table_productions, production_id, {
             "thumbnail_url": thumb_result.get("thumbnail_url"),
         })
+        self.tracker.log_fal_image(production_id, 1, "thumbnail Flux")
 
         # Fase 6: Normalização NCA → re-upload MinIO → URL para HeyGen
         audio_path_raw = nar_result.get("audio_path")
@@ -134,6 +138,7 @@ class VideoCrew:
 
         heygen_video_url = self.heygen.wait_for_completion(video_id)
         logger.info(f"VideoCrew: HeyGen concluído → {heygen_video_url}")
+        self.tracker.log_heygen(production_id, 1, "avatar principal")
 
         local_video = Path(f"/tmp/cirlene_{production_id}.mp4")
         self.heygen.download_video(heygen_video_url, local_video)
