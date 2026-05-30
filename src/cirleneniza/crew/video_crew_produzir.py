@@ -13,6 +13,7 @@ from cirleneniza.tools.minio import MinIOClient
 from cirleneniza.tools.fal import FalClient
 from cirleneniza.tools.nca_toolkit import NCAToolkitClient
 from cirleneniza.tools.baserow import BaserowClient
+from cirleneniza.tools.cost_tracker import CostTracker
 from cirleneniza.config import get_settings
 
 
@@ -60,6 +61,7 @@ class ProduzirCrew:
             base_url=cfg.baserow_url,
             token=cfg.baserow_token,
         )
+        self.tracker = CostTracker(self.baserow, cfg.baserow_table_costs)
         self._cfg = cfg
 
     def run(self, session: dict) -> dict:
@@ -97,6 +99,8 @@ class ProduzirCrew:
             "main": audio_main["audio_path"],
             "outro": audio_outro["audio_path"],
         }
+        total_chars = len(sd.get("intro", "")) + len(main_narration) + len(sd.get("outro", ""))
+        self.tracker.log_elevenlabs(production_id, total_chars, "narração intro+main+outro")
 
         # === FASE 5: EditorAudio — normaliza 3 áudios ===
         logger.info("Fase 5: EditorAudio — normalizando áudios")
@@ -131,6 +135,12 @@ class ProduzirCrew:
             "images": scene_images,
             "videos": scene_videos,
         }
+        n_imgs = len(scene_images)
+        n_vids = len(scene_videos)
+        if n_imgs:
+            self.tracker.log_fal_image(production_id, n_imgs, "cenas Flux 9:16")
+        if n_vids:
+            self.tracker.log_fal_video(production_id, n_vids, 5, "cenas Kling i2v")
 
         # === FASE 7: HeyGen — avatar intro + avatar outro ===
         logger.info("Fase 7: HeyGen — avatar intro + outro")
@@ -148,6 +158,7 @@ class ProduzirCrew:
         local_outro = Path(f"/tmp/cirlene_{production_id}_outro.mp4")
         self.heygen.download_video(video_intro_url, local_intro)
         self.heygen.download_video(video_outro_url, local_outro)
+        self.tracker.log_heygen(production_id, 2, "avatar intro + outro")
 
         # === FASE 8: EditorVideo — FFmpeg: intro + cenas + main + outro ===
         logger.info("Fase 8: EditorVideo — compondo vídeo final")
