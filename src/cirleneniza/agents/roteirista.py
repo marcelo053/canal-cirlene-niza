@@ -303,7 +303,11 @@ Now generate 2 prompts for: {topic}"""
     def execute(self, topic: str, research: str, style_guide: str) -> dict:
         logger.info(f"Roteirista v2b: gerando roteiro para '{topic}'")
         script_data = self.generate_script(topic, research, style_guide)
-        thumbnail_prompts = self.generate_thumbnail_prompts(topic, style_guide)
+        try:
+            thumbnail_prompts = self.generate_thumbnail_prompts(topic, style_guide)
+        except Exception as e:
+            logger.warning(f"Thumbnail prompts failed (skipping): {e}")
+            thumbnail_prompts = []
         return {
             "topic": topic,
             "intro": script_data["intro"],
