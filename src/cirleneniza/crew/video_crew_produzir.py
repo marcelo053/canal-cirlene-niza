@@ -234,16 +234,19 @@ class ProduzirCrew:
 
     def _concat_audio(self, audio_paths: list[Path], output: Path) -> Path:
         output.parent.mkdir(parents=True, exist_ok=True)
-        concat_list = output.parent / f"_audio_concat_{output.stem}.txt"
-        with open(concat_list, "w") as f:
-            for p in audio_paths:
-                f.write(f"file '{Path(p).resolve()}'\n")
-        subprocess.run(
-            ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
-             "-i", str(concat_list), "-c:a", "aac", str(output)],
-            capture_output=True, text=True, check=True,
+        inputs = []
+        for p in audio_paths:
+            inputs.extend(["-i", str(Path(p).resolve())])
+        n = len(audio_paths)
+        filter_complex = "".join(f"[{i}:a]" for i in range(n)) + f"concat=n={n}:v=0:a=1[out]"
+        result = subprocess.run(
+            ["ffmpeg", "-y", *inputs,
+             "-filter_complex", filter_complex,
+             "-map", "[out]", "-c:a", "aac", str(output)],
+            capture_output=True, text=True,
         )
-        concat_list.unlink(missing_ok=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"ffmpeg concat audio failed: {result.stderr[-500:]}")
         logger.info(f"ProduzirCrew: áudio concat → {output}")
         return output
 
