@@ -1,3 +1,4 @@
+import time
 from typing import Any
 from loguru import logger
 import google.genai as genai
@@ -11,6 +12,22 @@ class GeminiClient:
         settings = get_settings()
         self.model = model
         self.client = genai.Client(api_key=settings.gemini_api_key)
+
+    def _call_with_retry(self, fn, *args, retries: int = 4, **kwargs):
+        """Retry on 503/429 with exponential backoff."""
+        delay = 5
+        for attempt in range(retries):
+            try:
+                return fn(*args, **kwargs)
+            except Exception as e:
+                msg = str(e)
+                is_retryable = "503" in msg or "UNAVAILABLE" in msg or "429" in msg or "RESOURCE_EXHAUSTED" in msg
+                if is_retryable and attempt < retries - 1:
+                    logger.warning(f"Gemini {e.__class__.__name__} (tentativa {attempt+1}/{retries}), aguardando {delay}s...")
+                    time.sleep(delay)
+                    delay *= 2
+                else:
+                    raise
 
     def generate(
         self,
@@ -28,7 +45,8 @@ class GeminiClient:
         if system:
             contents.insert(0, system)
 
-        response = self.client.models.generate_content(
+        response = self._call_with_retry(
+            self.client.models.generate_content,
             model=self.model,
             contents=contents,
             config=generation_config,
@@ -44,7 +62,8 @@ class GeminiClient:
         """Generate structured output matching a Pydantic schema."""
         import json
 
-        response = self.client.models.generate_content(
+        response = self._call_with_retry(
+            self.client.models.generate_content,
             model=self.model,
             contents=[system, prompt] if system else [prompt],
             config={
