@@ -1,4 +1,5 @@
 import asyncio
+import json
 import signal
 import uuid
 import time
@@ -200,6 +201,21 @@ async def cmd_gerar_roteiro(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         session["script_data"] = sd
         session["step"] = "roteiro_ok"
 
+        # Persiste no Baserow para aprovação via Streamlit
+        try:
+            cfg = settings
+            baserow = BaserowClient(base_url=cfg.baserow_url, token=cfg.baserow_token)
+            prod_row = baserow.create_row(cfg.baserow_table_productions, {
+                "title": session["topic"],
+                "status": "rascunho",
+                "roteiro": sd.get("full_script", ""),
+                "keywords": json.dumps(sd, ensure_ascii=False),
+            })
+            session["production_id"] = prod_row["id"]
+            logger.info(f"Roteiro persistido no Baserow: production_id={prod_row['id']}")
+        except Exception as e:
+            logger.warning(f"Falha ao persistir roteiro no Baserow (não crítico): {e}")
+
         await msg.edit_text(
             f"[OK] Roteiro gerado e revisado\n"
             f"Cenas: {len(sd.get('cena_prompts', []))}\n"
@@ -310,6 +326,17 @@ async def cmd_gerar_thumbnail(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
         session["thumbnail_url"] = thumb_result.get("thumbnail_url")
         session["step"] = "thumbnail_ok"
+
+        # Atualiza thumbnail no Baserow se produção já foi criada
+        if session.get("production_id") and thumb_result.get("thumbnail_url"):
+            try:
+                cfg = settings
+                baserow = BaserowClient(base_url=cfg.baserow_url, token=cfg.baserow_token)
+                baserow.update_row(cfg.baserow_table_productions, session["production_id"], {
+                    "thumbnail_url": thumb_result["thumbnail_url"],
+                })
+            except Exception as e:
+                logger.warning(f"Falha ao atualizar thumbnail no Baserow: {e}")
 
         await msg.edit_text("[OK] Thumbnail gerado!")
         await update.message.reply_photo(thumb_result.get("thumbnail_url"))

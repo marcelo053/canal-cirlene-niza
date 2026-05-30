@@ -54,6 +54,24 @@ class BaserowClient:
             json=fields,
         )
 
+    def list_rows(
+        self,
+        table_id: int,
+        filter_field: str | None = None,
+        filter_value: str | None = None,
+        order_by: str = "-id",
+        size: int = 100,
+    ) -> list[dict[str, Any]]:
+        """List rows from a table, optionally filtered by a single field value."""
+        params: dict[str, Any] = {"user_field_names": "true", "order_by": order_by, "size": size}
+        if filter_field and filter_value is not None:
+            params[f"filter__{filter_field}__equal"] = filter_value
+        return self._request(
+            "GET",
+            f"/database/rows/table/{table_id}/",
+            params=params,
+        ).get("results", [])
+
     def get_style_guide(self, production_id: int) -> dict[str, Any] | None:
         """Get Visual Style Guide for a production from Baserow."""
         rows = self._request(
