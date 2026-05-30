@@ -189,21 +189,20 @@ class EditorVideo:
         ])
 
         # Step 3 — overlay main audio
+        # libx264 (not copy) so -shortest trims precisely at frame level
         cmd = [
             "ffmpeg", "-y",
             "-i", str(concat_out),
             "-i", str(main_audio),
             "-map", "0:v:0",
             "-map", "1:a:0",
-            "-c:v", "copy",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
             "-c:a", "aac",
             "-movflags", "+faststart",
             "-shortest",
         ]
         if srt_path:
             cmd[-1:-1] = ["-vf", f"subtitles={Path(srt_path).resolve()}"]
-            cmd[cmd.index("-c:v")] = "-c:v"
-            cmd[cmd.index("copy", cmd.index("-c:v"))] = "libx264"
 
         cmd.append(str(output))
         run_ffmpeg(cmd)

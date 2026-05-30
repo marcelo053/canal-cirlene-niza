@@ -1,4 +1,5 @@
 import re
+import uuid
 from loguru import logger
 from pathlib import Path
 from cirleneniza.config import get_settings
@@ -81,11 +82,12 @@ class Narrador:
         """Converte script em áudio MP3 via ElevenLabs voz clonada."""
         clean_text = prepare_for_tts(script)
 
-        output_path = None
         if output_dir:
             output_dir = Path(output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
             output_path = output_dir / "narration.mp3"
+        else:
+            output_path = Path(f"/tmp/narration_{uuid.uuid4().hex[:8]}.mp3")
 
         # stability=0.35 → mais expressiva, variação natural de entonação
         # similarity_boost=0.80 → mantém identidade da voz clonada

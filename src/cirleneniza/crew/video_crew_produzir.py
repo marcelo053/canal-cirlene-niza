@@ -1,3 +1,4 @@
+import subprocess
 import uuid
 from pathlib import Path
 from loguru import logger
@@ -114,6 +115,13 @@ class ProduzirCrew:
             "outro": str(norm_outro),
         }
 
+        # Concat full narration audio: intro + main + outro
+        combined_audio = self._concat_audio(
+            [norm_intro, norm_main, norm_outro],
+            output=Path(f"/tmp/cirlene_{production_id}_audio_full.mp3"),
+        )
+        result["combined_audio"] = str(combined_audio)
+
         # === FASE 5.5: GeradorDePrompts — enriquece cena_prompts com Kling 3.0 CSMEA ===
         logger.info("Fase 5.5: GeradorDePrompts — enriquecendo KLING PROMPTS")
         raw_cena_prompts = sd.get("cena_prompts", [])
@@ -175,7 +183,7 @@ class ProduzirCrew:
 
         final_video = self.editor_video.compose_from_segments(
             video_paths=all_videos,
-            main_audio=str(norm_main),
+            main_audio=str(combined_audio),
             output=Path(f"/tmp/cirlene_{production_id}_final.mp4"),
         )
 
@@ -212,7 +220,7 @@ class ProduzirCrew:
         result["post_ids"] = pub_result.get("post_ids")
 
         # Cleanup
-        cleanup_paths = [local_intro, local_outro, final_video, norm_intro, norm_main, norm_outro]
+        cleanup_paths = [local_intro, local_outro, final_video, norm_intro, norm_main, norm_outro, combined_audio]
         if srt_path:
             cleanup_paths.append(srt_path)
         for p in cleanup_paths:
@@ -223,6 +231,21 @@ class ProduzirCrew:
 
         logger.info(f"ProduzirCrew: concluído production_id={production_id}")
         return result
+
+    def _concat_audio(self, audio_paths: list[Path], output: Path) -> Path:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        concat_list = output.parent / f"_audio_concat_{output.stem}.txt"
+        with open(concat_list, "w") as f:
+            for p in audio_paths:
+                f.write(f"file '{Path(p).resolve()}'\n")
+        subprocess.run(
+            ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
+             "-i", str(concat_list), "-c:a", "aac", str(output)],
+            capture_output=True, text=True, check=True,
+        )
+        concat_list.unlink(missing_ok=True)
+        logger.info(f"ProduzirCrew: áudio concat → {output}")
+        return output
 
     def _download_url(self, url: str, path: Path) -> Path:
         import requests
