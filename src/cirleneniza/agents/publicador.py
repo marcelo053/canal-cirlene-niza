@@ -57,7 +57,9 @@ class Publicador:
         # --- Upload MinIO ---
         key = f"productions/{production_id}/{uuid.uuid4().hex[:8]}_{video_path.name}"
         self.minio.upload_file(video_path, cfg.minio_bucket_final, key)
-        video_url = self.minio.generate_presigned_url(cfg.minio_bucket_final, key, PRESIGNED_TTL)
+        # cirlene-final bucket is public — use direct URL (no signature expiry)
+        public_ep = (cfg.minio_public_endpoint or cfg.minio_endpoint).rstrip("/")
+        video_url = f"{public_ep}/{cfg.minio_bucket_final}/{key}"
         logger.info(f"Publicador: upload OK → {video_url}")
 
         # --- Criar posts no Baserow ---
