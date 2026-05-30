@@ -174,7 +174,7 @@ class ProduzirCrew:
             logger.info("Fase 9: NCA Toolkit — gerando legendas via URL MinIO")
             # NCA Toolkit requires public URL (not local path)
             audio_minio_key = f"productions/{production_id}/main_narration.mp3"
-            self.minio.upload_file(str(norm_main), audio_minio_key, bucket=self.minio.bucket_work)
+            self.minio.upload_file(str(norm_main), self.minio.bucket_work, audio_minio_key)
             audio_public_url = self.minio.generate_presigned_url(self.minio.bucket_work, audio_minio_key)
             from cirleneniza.tools.nca_toolkit import NCAToolkitClient as _NCA
             nca = _NCA(self._cfg.nca_toolkit_url, api_key=self._cfg.nca_api_key)
