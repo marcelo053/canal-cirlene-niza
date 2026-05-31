@@ -89,15 +89,15 @@ class Narrador:
         else:
             output_path = Path(f"/tmp/narration_{uuid.uuid4().hex[:8]}.mp3")
 
-        # stability=0.35 → mais expressiva, variação natural de entonação
+        # stability=0.50 → equilíbrio entre expressividade e consistência
         # similarity_boost=0.80 → mantém identidade da voz clonada
-        # style=0.45 → exagera estilo da voz original (ElevenLabs v2 param)
+        # style=0.20 → leve exagero de estilo sem artefatos
         audio_path = self.elevenlabs.synthesize(
             clean_text,
             output_path,
-            stability=0.35,
+            stability=0.50,
             similarity_boost=0.80,
-            style=0.45,
+            style=0.20,
         )
 
         return {

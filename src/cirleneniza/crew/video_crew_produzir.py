@@ -173,11 +173,21 @@ class ProduzirCrew:
 
         all_videos = [str(local_intro)]
         video_urls = [v["video_url"] for v in scene_videos]
+        num_scenes = len(video_urls)
 
-        for v_url in video_urls:
+        # Extend each scene to cover its share of main_duration so combined
+        # audio (intro+main+outro) stays in sync with total video duration.
+        scene_target_sec = (main_duration / num_scenes) if num_scenes else 5.0
+
+        scene_clips: list[Path] = []
+        for i, v_url in enumerate(video_urls):
             local_clip = Path(f"/tmp/cirlene_{production_id}_scene_{uuid.uuid4().hex[:6]}.mp4")
             self._download_url(v_url, local_clip)
-            all_videos.append(str(local_clip))
+            extended = Path(f"/tmp/cirlene_{production_id}_scene_ext_{i}.mp4")
+            self._extend_video(local_clip, extended, scene_target_sec)
+            local_clip.unlink(missing_ok=True)
+            scene_clips.append(extended)
+            all_videos.append(str(extended))
 
         all_videos.append(str(local_outro))
 
@@ -220,7 +230,7 @@ class ProduzirCrew:
         result["post_ids"] = pub_result.get("post_ids")
 
         # Cleanup
-        cleanup_paths = [local_intro, local_outro, final_video, norm_intro, norm_main, norm_outro, combined_audio]
+        cleanup_paths = [local_intro, local_outro, final_video, norm_intro, norm_main, norm_outro, combined_audio, *scene_clips]
         if srt_path:
             cleanup_paths.append(srt_path)
         for p in cleanup_paths:
@@ -231,6 +241,22 @@ class ProduzirCrew:
 
         logger.info(f"ProduzirCrew: concluído production_id={production_id}")
         return result
+
+    def _extend_video(self, src: Path, dst: Path, target_sec: float) -> Path:
+        """Loop src video to fill target_sec duration, re-encoding for clean cut."""
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        result = subprocess.run(
+            ["ffmpeg", "-y", "-stream_loop", "-1", "-i", str(src),
+             "-t", str(round(target_sec, 3)),
+             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-an",
+             str(dst)],
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            logger.warning(f"_extend_video failed ({result.stderr[-200:]}), using original")
+            import shutil
+            shutil.copy(src, dst)
+        return dst
 
     def _concat_audio(self, audio_paths: list[Path], output: Path) -> Path:
         output.parent.mkdir(parents=True, exist_ok=True)
