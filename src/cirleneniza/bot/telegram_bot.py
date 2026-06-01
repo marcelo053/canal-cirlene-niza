@@ -447,6 +447,38 @@ async def run_production_background(chat_id: int, reply_to: int, user_id: int):
         else:
             await bot.send_message(chat_id=chat_id, text="[AVISO] Video URL nao disponivel.")
 
+        # Send scientific slides preview
+        slide_urls = result.get("slide_urls", [])
+        if slide_urls:
+            await bot.send_message(
+                chat_id=chat_id,
+                text=f"[Slides Cientificos] {len(slide_urls)} slide(s) gerados para '{session.get('topic', '')}' — enviando...",
+            )
+            for i, slide_url in enumerate(slide_urls, 1):
+                try:
+                    if slide_url.startswith("http"):
+                        await bot.send_video(
+                            chat_id=chat_id,
+                            video=slide_url,
+                            caption=f"Slide cientifico {i}/{len(slide_urls)}",
+                            supports_streaming=True,
+                        )
+                    else:
+                        # local path fallback
+                        from pathlib import Path as _Path
+                        p = _Path(slide_url)
+                        if p.exists():
+                            with open(p, "rb") as f:
+                                await bot.send_video(
+                                    chat_id=chat_id,
+                                    video=f,
+                                    caption=f"Slide cientifico {i}/{len(slide_urls)}",
+                                    supports_streaming=True,
+                                )
+                except Exception as slide_e:
+                    logger.warning(f"Slide {i} nao enviado: {slide_e}")
+                    await bot.send_message(chat_id=chat_id, text=f"Slide {i}: {slide_url}")
+
     except Exception as e:
         logger.error(f"Erro producao: {e}")
         await bot.edit_message_text(

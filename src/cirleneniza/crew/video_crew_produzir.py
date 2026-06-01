@@ -7,6 +7,7 @@ from cirleneniza.agents.narrador import Narrador
 from cirleneniza.agents.editor_audio import EditorAudio
 from cirleneniza.agents.gerador_cenas import GeradorCenas
 from cirleneniza.agents.gerador_prompts import GeradorDePrompts
+from cirleneniza.agents.gerador_slides import GeradorSlidesCientificos
 from cirleneniza.agents.editor_video import EditorVideo
 from cirleneniza.agents.publicador import Publicador
 from cirleneniza.tools.heygen import HeyGenClient
@@ -45,6 +46,7 @@ class ProduzirCrew:
         self.gerador_cenas = GeradorCenas()
         self.gerador_prompts = GeradorDePrompts()
         self.editor_video = EditorVideo(nca=NCAToolkitClient(cfg.nca_toolkit_url, api_key=cfg.nca_api_key))
+        self.gerador_slides = GeradorSlidesCientificos(minio=self.minio)
         self.publicador = Publicador()
         self.minio = MinIOClient(
             endpoint=cfg.minio_endpoint.removeprefix("http://"),
@@ -150,6 +152,25 @@ class ProduzirCrew:
         if n_vids:
             self.tracker.log_fal_video(production_id, n_vids, 5, "cenas Kling i2v")
 
+        # === FASE 6.5: GeradorSlidesCientificos — slides Remotion (assets independentes) ===
+        slide_urls: list[str] = []
+        try:
+            research = session.get("research", "")
+            if research:
+                logger.info("Fase 6.5: GeradorSlides — renderizando slides científicos")
+                slides_result = self.gerador_slides.execute(
+                    research=research,
+                    topic=topic,
+                    production_id=production_id,
+                )
+                slide_urls = slides_result.get("slide_urls", [])
+                result["slide_urls"] = slide_urls
+                logger.info(f"Fase 6.5: {len(slide_urls)} slides gerados")
+            else:
+                logger.warning("Fase 6.5: sem research disponível — slides ignorados")
+        except Exception as e:
+            logger.warning(f"Fase 6.5: slides falharam (pipeline continua): {e}")
+
         # === FASE 7: HeyGen — avatar intro + avatar outro ===
         logger.info("Fase 7: HeyGen — avatar intro + outro")
         asset_intro = self.heygen.upload_audio(norm_intro)
@@ -228,6 +249,7 @@ class ProduzirCrew:
         result["status"] = "published"
         result["video_url"] = pub_result.get("video_url")
         result["post_ids"] = pub_result.get("post_ids")
+        result["slide_urls"] = slide_urls
 
         # Cleanup
         cleanup_paths = [local_intro, local_outro, final_video, norm_intro, norm_main, norm_outro, combined_audio, *scene_clips]
