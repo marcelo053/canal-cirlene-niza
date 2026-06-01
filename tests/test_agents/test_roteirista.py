@@ -88,3 +88,42 @@ ATMOSPHERE: inspiring
 
 ## OUTRO
 Obrigada por assistir! Me segue para mais conteúdos de saúde com base científica."""
+
+
+import json as _json
+
+_PLAN_RESPONSE = _json.dumps({
+    "hook_type": "myth_break",
+    "hook_rationale": "A maioria acredita que proteína engorda — derruba o mito imediatamente",
+    "narrative_arc": ["mito da proteína", "absorção rápida", "dado 73%", "CTA orgânico",
+                      "pergunta reflexiva", "conclusão motivadora"],
+    "cta_position": 4,
+    "reflection_position": 5,
+    "key_data_to_use": ["73% dos estudos", "30 minutos para absorção"]
+})
+
+
+def test_roteirista_has_plan_script_method():
+    with patch("cirleneniza.agents.roteirista.MiniMaxClient"):
+        agent = RoteiristaCirleneNiza()
+    assert hasattr(agent, "_plan_script")
+
+
+def test_plan_script_returns_dict_with_hook_type():
+    with patch("cirleneniza.agents.roteirista.MiniMaxClient") as MockLLM:
+        MockLLM.return_value.generate.return_value = _PLAN_RESPONSE
+        agent = RoteiristaCirleneNiza()
+        plan = agent._plan_script("proteína", "pesquisa científica")
+    assert plan["hook_type"] in ("myth_break", "immediate_benefit",
+                                  "counter_intuitive", "mirror_question")
+    assert "narrative_arc" in plan
+    assert len(plan["narrative_arc"]) >= 6
+
+
+def test_plan_script_fallback_on_json_error():
+    """Se o LLM não retornar JSON, deve retornar plano padrão sem crash."""
+    with patch("cirleneniza.agents.roteirista.MiniMaxClient") as MockLLM:
+        MockLLM.return_value.generate.return_value = "resposta não é JSON"
+        agent = RoteiristaCirleneNiza()
+        plan = agent._plan_script("proteína", "pesquisa")
+    assert "hook_type" in plan

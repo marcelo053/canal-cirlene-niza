@@ -1,6 +1,7 @@
 from crewai import Agent
 from loguru import logger
 import re
+import json
 from cirleneniza.tools.minimax import MiniMaxClient
 
 
@@ -24,13 +25,55 @@ Reconhece barreiras: tempo, dinheiro, acesso.
 Tom: calorosa, acessível, sem ser bobinha. Animada mas não hiperativa."""
 
 
+_PLAN_PROMPT = """Antes de escrever o roteiro, planeje a estratégia narrativa.
+
+Tema: {topic}
+Pesquisa científica:
+{research}
+
+Retorne SOMENTE JSON válido:
+{{
+  "hook_type": "myth_break | immediate_benefit | counter_intuitive | mirror_question",
+  "hook_rationale": "por que esse hook funciona para esse tema (1 frase)",
+  "narrative_arc": ["cena1_tema", "cena2_tema", "cena3_tema", "cena4_tema", "cena5_tema", "cena6_tema"],
+  "cta_position": 4,
+  "reflection_position": 5,
+  "key_data_to_use": ["dado 1 da pesquisa", "dado 2 da pesquisa"]
+}}
+
+Regras:
+- narrative_arc: mínimo 6 temas em português (máximo 8)
+- cta_position: qual cena (1-based) recebe "salva esse vídeo" ou similar
+- reflection_position: qual cena tem pergunta reflexiva ao público
+- hook_rationale: explica POR QUE esse hook específico é o mais forte para o tema"""
+
+_DEFAULT_PLAN = {
+    "hook_type": "immediate_benefit",
+    "hook_rationale": "benefício direto sempre engaja",
+    "narrative_arc": ["introdução", "dado 1", "dado 2", "CTA orgânico",
+                      "reflexão", "conclusão"],
+    "cta_position": 4,
+    "reflection_position": 5,
+    "key_data_to_use": [],
+}
+
+
 SCRIPT_PROMPT_TEMPLATE = """Gere um roteiro de VIDEO CANAL CIRLENE NIZA sobre: {topic}
+
+{plan_context}
 
 Contexto científico:
 {research}
 
 Style Guide:
 {style_guide}
+
+## EXEMPLOS DE LOCUTOR RUIM vs BOM
+❌ RUIM: "A proteína é um macronutriente essencial composto por aminoácidos que desempenha papel fundamental no metabolismo celular."
+✅ BOM: "Proteína... é o nutriente que faz seu músculo crescer. Simples assim."
+
+❌ RUIM: "Estudos demonstram que o consumo adequado de proteína está associado a benefícios para a composição corporal."
+✅ BOM: "Em 30 dias comendo proteína certa... você já vê diferença no espelho. A ciência confirma."
 
 ## REGRAS OBRIGATÓRIAS
 
@@ -138,9 +181,37 @@ class RoteiristaCirleneNiza:
         self.backstory = PERSONA_PROMPT
         self.goal = "Gerar roteiro engajante com hook forte e prompts Kling prontos para produção."
 
+    def _plan_script(self, topic: str, research: str) -> dict:
+        """Gera plano narrativo via CoT antes de escrever o roteiro."""
+        prompt = _PLAN_PROMPT.format(topic=topic, research=research[:2000])
+        try:
+            raw = self.llm.generate(prompt, system=PERSONA_PROMPT, temperature=0.6, max_tokens=512)
+            clean = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("`")
+            plan = json.loads(clean)
+            if len(plan.get("narrative_arc", [])) < 6:
+                plan["narrative_arc"] = _DEFAULT_PLAN["narrative_arc"]
+            logger.info(f"Roteirista: plano → hook={plan.get('hook_type')}, cenas={len(plan.get('narrative_arc', []))}")
+            return plan
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.warning(f"Roteirista: plano falhou ({e}), usando padrão")
+            return _DEFAULT_PLAN.copy()
+
     def generate_script(self, topic: str, research: str, style_guide: str) -> dict:
+        plan = self._plan_script(topic, research)
+        plan_context = (
+            f"Plano narrativo definido:\n"
+            f"- Hook: {plan['hook_type']} — {plan['hook_rationale']}\n"
+            f"- Arco: {' → '.join(plan['narrative_arc'])}\n"
+            f"- CTA na cena: {plan['cta_position']}\n"
+            f"- Reflexão na cena: {plan['reflection_position']}\n"
+            f"- Dados-chave: {', '.join(plan['key_data_to_use'])}\n"
+            f"\nSiga EXATAMENTE este plano ao escrever cada cena."
+        )
         prompt = SCRIPT_PROMPT_TEMPLATE.format(
-            topic=topic, research=research, style_guide=style_guide
+            topic=topic,
+            research=research,
+            style_guide=style_guide,
+            plan_context=plan_context,
         )
         result = self.llm.generate(
             prompt,
