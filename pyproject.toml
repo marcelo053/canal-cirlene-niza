@@ -8,7 +8,7 @@ license = "MIT"
 authors = [{ name = "Marcelo", email = "marcelo@example.com" }]
 dependencies = [
     "crewai>=0.100.0",
-    "crewai-tools>=0.20.0",
+    "crewai-tools>=0.0.1",
     "python-telegram-bot>=20.0",
     "fal-client>=0.10.0",
     "google-genai>=1.0.0",
