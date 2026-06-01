@@ -1,9 +1,14 @@
+import re
 import time
 import json
 from typing import Any
 from loguru import logger
 import anthropic
 from cirleneniza.config import get_settings
+
+_CJK_PATTERN = re.compile(
+    r"[　-鿿一-鿿豈-﫿︰-﹏]"
+)
 
 
 class MiniMaxClient:
@@ -40,14 +45,14 @@ class MiniMaxClient:
 
     MIN_TOKENS = 512  # M2.7 uses tokens for thinking — never go below this
 
-    def generate(
+    def _call_api(
         self,
         prompt: str,
-        system: str | None = None,
-        temperature: float = 0.7,
-        max_tokens: int = 8192,
+        system: str | None,
+        temperature: float,
+        max_tokens: int,
     ) -> str:
-        """Generate text from MiniMax M2.7. Same interface as GeminiClient.generate()."""
+        """Chamada bruta à API MiniMax — separado para facilitar retry e mock."""
 
         def _call():
             kwargs: dict[str, Any] = {
@@ -67,6 +72,28 @@ class MiniMaxClient:
             raise ValueError(f"No text block in response: {response.content}")
 
         return self._call_with_retry(_call)
+
+    def generate(
+        self,
+        prompt: str,
+        system: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int = 8192,
+        retries: int = 2,
+    ) -> str:
+        """Gera texto com retry automático se output CJK detectado."""
+        result = ""
+        for attempt in range(retries + 1):
+            result = self._call_api(prompt, system, temperature, max_tokens)
+            cjk_ratio = len(_CJK_PATTERN.findall(result)) / max(len(result), 1)
+            if cjk_ratio < 0.05:
+                return result
+            if attempt < retries:
+                logger.warning(
+                    f"MiniMax output CJK detectado ({cjk_ratio:.1%}), tentativa {attempt+1}/{retries}..."
+                )
+        # Fallback: strip CJK from last result
+        return re.sub(_CJK_PATTERN, "", result).strip()
 
     def generate_structured(
         self,
