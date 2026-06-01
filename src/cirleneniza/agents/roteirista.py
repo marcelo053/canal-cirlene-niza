@@ -129,7 +129,7 @@ class RoteiristaCirleneNiza:
     """Agente Roteirista v2b — CSMEA + hook_technique + kling_motion_prompt."""
 
     def __init__(self):
-        self.gemini = MiniMaxClient()
+        self.llm = MiniMaxClient()
         self.name = "Roteirista"
         self.role = (
             "Escritor de roteiros para vídeos de saúde e bem-estar. "
@@ -142,7 +142,7 @@ class RoteiristaCirleneNiza:
         prompt = SCRIPT_PROMPT_TEMPLATE.format(
             topic=topic, research=research, style_guide=style_guide
         )
-        result = self.gemini.generate(
+        result = self.llm.generate(
             prompt,
             system=PERSONA_PROMPT,
             temperature=0.8,
@@ -275,7 +275,7 @@ class RoteiristaCirleneNiza:
                 f"ROTEIRO:\n{current.get('full_script', '')}\n\n"
                 f"Retorna roteiro completo com formato v2b."
             )
-        result = self.gemini.generate(prompt, system=PERSONA_PROMPT, temperature=0.8)
+        result = self.llm.generate(prompt, system=PERSONA_PROMPT, temperature=0.8)
         return self._parse_script(result)
 
     def generate_thumbnail_prompts(self, topic: str, style_guide: str) -> list[str]:
@@ -291,7 +291,7 @@ RULES:
 - Return exactly 2 prompts, each on its own line, no numbering, no labels
 
 Now generate 2 prompts for: {topic}"""
-        result = self.gemini.generate(prompt, temperature=0.6)
+        result = self.llm.generate(prompt, temperature=0.6)
         return [
             line.strip()
             for line in result.strip().split("\n")

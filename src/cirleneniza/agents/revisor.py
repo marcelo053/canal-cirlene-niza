@@ -6,8 +6,8 @@ from cirleneniza.tools.minimax import MiniMaxClient
 class RevisorEspecialista:
     """Agente Revisor Especialista — valida precisão científica dos roteiros."""
 
-    def __init__(self, gemini: MiniMaxClient | None = None):
-        self.gemini = gemini or MiniMaxClient()
+    def __init__(self, llm: MiniMaxClient | None = None):
+        self.llm = llm or MiniMaxClient()
         self.name = "Revisor Especialista"
         self.role = (
             "Revisor científico especialista em saúde e nutrição. "
@@ -36,7 +36,7 @@ Para cada claim/afirmação no roteiro, classifique:
 Se encontrar problemas, sugira correção com fonte (genérica se necessário).
 Se tudo estiver ok, confirme com "APROVADO"."""
 
-        result = self.gemini.generate(prompt, temperature=0.3)
+        result = self.llm.generate(prompt, temperature=0.3)
         return {"validation": result}
 
     def execute(self, script: str) -> dict:

@@ -4,8 +4,8 @@ from cirleneniza.agents.revisor import RevisorEspecialista
 
 
 def test_revisor_role():
-    mock_gemini = MagicMock()
-    agent = RevisorEspecialista(gemini=mock_gemini)
+    mock_llm = MagicMock()
+    agent = RevisorEspecialista(llm=mock_llm)
     assert agent.name == "Revisor Especialista"
     assert hasattr(agent, "validate_script")
     assert hasattr(agent, "execute")

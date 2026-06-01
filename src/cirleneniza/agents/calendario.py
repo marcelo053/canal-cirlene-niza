@@ -24,8 +24,8 @@ def _timeout(seconds: int):
 class CalendarioEditorial:
     """Agente Calendário Editorial — pesquisa científica e Style Guide."""
 
-    def __init__(self, gemini: "MiniMaxClient | None" = None):
-        self.gemini = gemini if gemini is not None else MiniMaxClient()
+    def __init__(self, llm: "MiniMaxClient | None" = None):
+        self.llm = llm if llm is not None else MiniMaxClient()
         self.name = "Calendário Editorial"
         self.role = (
             "Pesquisador de saúde e bem-estar. "
@@ -50,7 +50,7 @@ Forneca em formato de lista numerada (sem Headers, sem marcadores de cena, sem t
 
 Seja direto, factual, baseado em ciencia.
 Idioma: portugues brasileiro."""
-        result = self.gemini.generate(prompt, temperature=0.5)
+        result = self.llm.generate(prompt, temperature=0.5)
         return {"topic": topic, "research": result.strip()}
 
     def generate_style_guide(self, topic: str, research: str) -> dict:
@@ -67,7 +67,7 @@ Referencia visual: [1 frase]
 Composicao: [1 frase]
 
 PROIBIDO: nao use ## nem # nem * nem **. Nao acrescente secoes extras. Apenas as 4 linhas acima."""
-        result = self.gemini.generate(prompt, temperature=0.6)
+        result = self.llm.generate(prompt, temperature=0.6)
         return {"style_guide": result.strip()}
 
     def execute(self, topic: str) -> dict:

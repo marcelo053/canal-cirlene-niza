@@ -130,7 +130,7 @@ class GeradorSlidesCientificos:
         minio: MinIOClient | None = None,
         renderer: RemotionRenderer | None = None,
     ):
-        self.gemini = MiniMaxClient()
+        self.llm = MiniMaxClient()
         self.renderer = renderer or RemotionRenderer(minio)
         self.name = "Gerador de Slides Científicos"
 
@@ -141,7 +141,7 @@ class GeradorSlidesCientificos:
     def extract_slides(self, research: str, topic: str) -> list[dict]:
         """Use LLM to extract structured slide data from research text."""
         prompt = _EXTRACT_PROMPT.format(research=research, topic=topic)
-        raw = self.gemini.generate(prompt, temperature=0.3, max_tokens=4096)
+        raw = self.llm.generate(prompt, temperature=0.3, max_tokens=4096)
 
         # Strip markdown code fences if present
         raw = re.sub(r"```(?:json)?\s*", "", raw).strip()
