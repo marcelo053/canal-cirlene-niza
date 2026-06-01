@@ -78,16 +78,16 @@ class VideoCrew:
 
         # Fase 4: Narração ElevenLabs → MinIO
         nar_result = self.narrador.execute(
-            script=rot_result["script"],
+            script=rot_result["main"],
             production_id=production_id,
         )
         logger.info(f"VideoCrew: narração gerada — {nar_result.get('char_count', 0)} chars")
 
         self.baserow.update_row(cfg.baserow_table_productions, production_id, {
-            "roteiro": rot_result["script"],
+            "roteiro": rot_result["full_script"],
             "status": "em_producao",
         })
-        self.tracker.log_elevenlabs(production_id, len(rot_result["script"]), "narração principal")
+        self.tracker.log_elevenlabs(production_id, len(rot_result["main"]), "narração principal")
 
         # Fase 5: Thumbnail fal.ai
         thumbnail_prompts = rot_result.get("thumbnail_prompts", [])
@@ -150,7 +150,7 @@ class VideoCrew:
             video_path=local_video,
             production_id=production_id,
             title=topic,
-            description=rot_result["script"][:500],
+            description=rot_result["full_script"][:500],
             tags="saude,bemestar,cirlenienia",
         )
         logger.info(f"VideoCrew: publicado → {pub_result['video_url']}")
@@ -166,7 +166,7 @@ class VideoCrew:
             "topic": topic,
             "production_id": production_id,
             "research": cal_result["research"],
-            "script": rot_result["script"],
+            "script": rot_result["full_script"],
             "validation": rev_result["status"],
             "thumbnail_url": thumb_result.get("thumbnail_url"),
             "audio_path": audio_path_raw,
