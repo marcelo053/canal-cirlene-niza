@@ -1,3 +1,6 @@
+import json
+import re
+
 from crewai import Agent
 from loguru import logger
 from cirleneniza.tools.minimax import MiniMaxClient
@@ -22,31 +25,47 @@ class RevisorEspecialista:
         self.goal = "Garantir que todo roteiro seja scientificamente preciso e motivador."
 
     def validate_script(self, script: str) -> dict:
-        """Revisa o roteiro e retorna correções."""
+        """Revisa o roteiro e retorna JSON estruturado com claims."""
         prompt = f"""Revise este roteiro de vídeo de saúde:
 
 {script}
 
-Para cada claim/afirmação no roteiro, classifique:
-- OK: claim preciso e bem fundamentado
-- EXAGERO: claim exagerado que precisa ser atenuado
-- ERRADO: claim incorreto que precisa ser substituído
-- VAGO: claim muito genérico que precisa de dado específico
+Retorne SOMENTE JSON válido:
+{{
+  "claims": [
+    {{
+      "claim": "texto da afirmação exata do roteiro",
+      "status": "ok | exagero | errado | vago",
+      "suggestion": "correção sugerida ou null"
+    }}
+  ],
+  "overall_score": 0.0
+}}
 
-Se encontrar problemas, sugira correção com fonte (genérica se necessário).
-Se tudo estiver ok, confirme com "APROVADO"."""
-
-        result = self.llm.generate(prompt, temperature=0.3)
-        return {"validation": result}
+Regras de classificação:
+- "errado": dado falso ou contrafactual confirmado
+- "exagero": verdadeiro mas sem nuance necessária
+- "vago": afirmação sem dado concreto quando existe evidência numérica
+- "ok": claim preciso, bem fundamentado
+- overall_score: proporção de claims "ok" (0.0 a 1.0)
+- Analise TODAS as afirmações de saúde/nutrição do roteiro"""
+        raw = self.llm.generate(prompt, temperature=0.1)
+        clean = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("`")
+        data = json.loads(clean)
+        return data
 
     def execute(self, script: str) -> dict:
         """Executa revisão completa."""
         logger.info("Revisor: validando roteiro")
-        validation = self.validate_script(script)
+        data = self.validate_script(script)
+        claims = data.get("claims", [])
+        has_error = any(c.get("status") == "errado" for c in claims)
         return {
             "original_script": script,
-            "validation": validation["validation"],
-            "status": "needs_revision" if "ERRADO" in validation["validation"] else "approved",
+            "claims": claims,
+            "overall_score": data.get("overall_score", 1.0),
+            "validation": json.dumps(data, ensure_ascii=False),  # compat string
+            "status": "needs_revision" if has_error else "approved",
         }
 
 
