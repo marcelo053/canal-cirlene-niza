@@ -4,6 +4,9 @@ Conhecimento base extraído do NotebookLM:
   "Kling AI & Engenharia de Prompt para Vídeo — Canal Cirlene Niza"
   Notebook ID: d7550e5e-c453-4b9a-afaa-f0a667d6f20f
 """
+import json
+import re
+
 from loguru import logger
 from cirleneniza.tools.minimax import MiniMaxClient
 
@@ -78,10 +81,7 @@ Structure: [Camera/Shot type + movement]. [Subject precisely described]. [Action
 
 ## OUTPUT FORMAT
 
-After your internal reasoning, output EXACTLY this structure:
-KLING_PROMPT_START
-[the complete CSMEA prompt here — nothing else]
-KLING_PROMPT_END
+Return your response as valid JSON only — no prose, no markdown fences.
 """
 
 _QUERY = """\
@@ -95,11 +95,14 @@ Camera suggestion: {camera}
 Lighting: {lighting}
 Atmosphere: {atmosphere}
 
-Detect the scene type, apply the correct template.
-Output format (mandatory):
-KLING_PROMPT_START
-[your complete CSMEA prompt here]
-KLING_PROMPT_END
+Detect the scene type (hook/informative/food_broll/cta) and apply the correct template.
+
+Return ONLY valid JSON — no markdown, no explanation:
+{{
+  "scene": "{scene}",
+  "kling_motion_prompt": "complete CSMEA prompt here ending with Vertical 9:16. Photorealistic. Cinematic 4K.",
+  "scene_type": "hook | informative | food_broll | cta"
+}}
 """
 
 
@@ -115,7 +118,7 @@ class GeradorDePrompts:
         self.name = "Gerador de Prompts"
 
     def enrich_scene(self, scene: dict) -> dict:
-        """Gera KLING PROMPT otimizado para uma cena e retorna scene atualizado."""
+        """Gera KLING PROMPT otimizado para uma cena via JSON output."""
         prompt = _QUERY.format(
             scene=scene.get("scene", ""),
             hook_technique=scene.get("hook_technique", ""),
@@ -132,21 +135,26 @@ class GeradorDePrompts:
                 temperature=0.7,
                 max_tokens=1024,
             ).strip()
-            # Extract between markers (M2.7 reasons out loud before the actual prompt)
-            kling_prompt = self._extract_prompt(raw)
-            # Safety: ensure ends with required tags
+            clean = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("`")
+            data = json.loads(clean)
+            kling_prompt = data.get("kling_motion_prompt", "")
+            scene_type = data.get("scene_type", "informative")
             if "Vertical 9:16" not in kling_prompt:
                 kling_prompt += " Vertical 9:16. Photorealistic. Cinematic 4K."
             updated = dict(scene)
             updated["kling_motion_prompt"] = kling_prompt
-            updated["prompt"] = kling_prompt  # legacy compat
+            updated["prompt"] = kling_prompt   # legacy compat
+            updated["scene_type"] = scene_type
             logger.info(
-                f"GeradorDePrompts: cena '{scene.get('scene', '')[:40]}' → "
-                f"{len(kling_prompt)} chars"
+                f"GeradorDePrompts: cena '{scene.get('scene', '')[:40]}' "
+                f"[{scene_type}] → {len(kling_prompt)} chars"
             )
             return updated
-        except Exception as e:
-            logger.warning(f"GeradorDePrompts: erro na cena '{scene.get('scene', '')}': {e} — mantendo original")
+        except (Exception) as e:
+            logger.warning(
+                f"GeradorDePrompts: falhou para '{scene.get('scene', '')}': {e} "
+                f"— mantendo original"
+            )
             return scene
 
     @staticmethod

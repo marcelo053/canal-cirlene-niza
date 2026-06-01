@@ -1,7 +1,7 @@
+import json
 import sys
 from unittest.mock import MagicMock, patch
 
-# Mock anthropic before importing MiniMaxClient
 sys.modules.setdefault("anthropic", MagicMock())
 
 from cirleneniza.agents.gerador_prompts import GeradorDePrompts
@@ -16,78 +16,88 @@ def test_initialization():
         assert hasattr(agent, "execute")
 
 
-# --- _extract_prompt (static, no mocking needed) ---
-
-def test_extract_prompt_with_markers():
-    raw = "some reasoning\nKLING_PROMPT_START\nClose-up shot of Cirlene.\nKLING_PROMPT_END\nend"
-    result = GeradorDePrompts._extract_prompt(raw)
-    assert result == "Close-up shot of Cirlene."
-
-
-def test_extract_prompt_fallback_camera_terms():
-    raw = "Here is my analysis.\n\nClose-up shot with slow zoom in. Cirlene smiles. Kitchen background. Natural light."
-    result = GeradorDePrompts._extract_prompt(raw)
-    assert "close-up" in result.lower() or "zoom" in result.lower()
-
-
-def test_extract_prompt_last_line_fallback():
-    raw = "short text\nno camera terms here\nfinal line"
-    result = GeradorDePrompts._extract_prompt(raw)
-    assert result == "final line"
-
-
-def test_extract_prompt_appends_vertical_tag_if_missing():
+def test_enrich_scene_returns_json_kling_prompt():
+    """enrich_scene parses JSON and returns kling_motion_prompt."""
+    json_response = json.dumps({
+        "scene": "Cena 1: Hook",
+        "kling_motion_prompt": "Close-up shot, slow zoom in. Protein powder in shaker. Kitchen. Soft light. Vertical 9:16. Photorealistic. Cinematic 4K.",
+        "scene_type": "hook"
+    })
     with patch("cirleneniza.agents.gerador_prompts.MiniMaxClient") as MockLLM:
-        MockLLM().generate.return_value = (
-            "KLING_PROMPT_START\nClose-up shot. Cirlene smiles.\nKLING_PROMPT_END"
-        )
+        MockLLM().generate.return_value = json_response
         agent = GeradorDePrompts()
-        scene = {"scene": "Cena 1", "prompt": "original"}
+        scene = {
+            "scene": "Cena 1: Hook",
+            "hook_technique": "myth_break",
+            "locutor": "Proteína não engorda.",
+            "nota_visual": "Pó de proteína",
+            "camera": "close-up",
+            "lighting": "soft natural light",
+            "atmosphere": "inspiring",
+        }
         result = agent.enrich_scene(scene)
-        assert "Vertical 9:16" in result["kling_motion_prompt"]
+    assert "Vertical 9:16" in result["kling_motion_prompt"]
+    assert result["scene_type"] == "hook"
+    assert "kling_motion_prompt" in result
+    assert "prompt" in result  # legacy compat
 
 
-def test_enrich_scene_calls_llm_and_returns_updated_scene():
+def test_enrich_scene_falls_back_on_json_parse_error():
+    """If LLM doesn't return valid JSON, returns original scene unchanged."""
     with patch("cirleneniza.agents.gerador_prompts.MiniMaxClient") as MockLLM:
-        MockLLM().generate.return_value = (
-            "KLING_PROMPT_START\n"
-            "Close-up of Cirlene. Camera zooms in. Kitchen. Natural light. "
-            "Vertical 9:16. Photorealistic. Cinematic 4K.\n"
-            "KLING_PROMPT_END"
-        )
+        MockLLM().generate.return_value = "texto não é JSON"
         agent = GeradorDePrompts()
-        scene = {"scene": "Cena 1", "prompt": "original", "camera": "close-up"}
+        scene = {"scene": "Cena 1", "prompt": "original prompt"}
         result = agent.enrich_scene(scene)
-        assert "kling_motion_prompt" in result
-        assert "prompt" in result
-        assert "Cirlene" in result["kling_motion_prompt"]
+    assert result["scene"] == "Cena 1"  # original preserved
+
+
+def test_enrich_scene_appends_vertical_tag_if_missing():
+    """If kling_motion_prompt lacks Vertical 9:16, it gets appended."""
+    json_response = json.dumps({
+        "scene": "Cena 1",
+        "kling_motion_prompt": "Close-up shot. Protein powder. Kitchen. Soft light.",
+        "scene_type": "informative"
+    })
+    with patch("cirleneniza.agents.gerador_prompts.MiniMaxClient") as MockLLM:
+        MockLLM().generate.return_value = json_response
+        agent = GeradorDePrompts()
+        result = agent.enrich_scene({"scene": "Cena 1"})
+    assert "Vertical 9:16" in result["kling_motion_prompt"]
 
 
 def test_enrich_scene_swallows_llm_exception():
+    """API errors return original scene unchanged."""
     with patch("cirleneniza.agents.gerador_prompts.MiniMaxClient") as MockLLM:
         MockLLM().generate.side_effect = Exception("API error")
         agent = GeradorDePrompts()
         original = {"scene": "Cena 1", "prompt": "original"}
         result = agent.enrich_scene(original)
-        assert result == original  # returns unchanged scene
+    assert result == original
 
 
 def test_enrich_processes_all_scenes():
+    json_response = json.dumps({
+        "scene": "Cena",
+        "kling_motion_prompt": "Shot. Vertical 9:16. Photorealistic.",
+        "scene_type": "informative"
+    })
     with patch("cirleneniza.agents.gerador_prompts.MiniMaxClient") as MockLLM:
-        MockLLM().generate.return_value = (
-            "KLING_PROMPT_START\nSome prompt. Vertical 9:16. Photorealistic.\nKLING_PROMPT_END"
-        )
+        MockLLM().generate.return_value = json_response
         agent = GeradorDePrompts()
         scenes = [{"scene": f"Cena {i}"} for i in range(3)]
         result = agent.enrich(scenes)
-        assert len(result) == 3
+    assert len(result) == 3
 
 
 def test_execute_aliases_enrich():
+    json_response = json.dumps({
+        "scene": "Cena",
+        "kling_motion_prompt": "Prompt. Vertical 9:16.",
+        "scene_type": "hook"
+    })
     with patch("cirleneniza.agents.gerador_prompts.MiniMaxClient") as MockLLM:
-        MockLLM().generate.return_value = (
-            "KLING_PROMPT_START\nPrompt. Vertical 9:16.\nKLING_PROMPT_END"
-        )
+        MockLLM().generate.return_value = json_response
         agent = GeradorDePrompts()
         scenes = [{"scene": "C1"}]
         assert agent.execute(scenes) == agent.enrich(scenes)
