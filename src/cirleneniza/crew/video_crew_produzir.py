@@ -46,8 +46,6 @@ class ProduzirCrew:
         self.gerador_cenas = GeradorCenas()
         self.gerador_prompts = GeradorDePrompts()
         self.editor_video = EditorVideo(nca=NCAToolkitClient(cfg.nca_toolkit_url, api_key=cfg.nca_api_key))
-        self.gerador_slides = GeradorSlidesCientificos(minio=self.minio)
-        self.publicador = Publicador()
         self.minio = MinIOClient(
             endpoint=cfg.minio_endpoint.removeprefix("http://"),
             access_key=cfg.minio_access_key,
@@ -56,6 +54,8 @@ class ProduzirCrew:
             bucket_final=cfg.minio_bucket_final,
             public_endpoint=cfg.minio_public_endpoint or None,
         )
+        self.gerador_slides = GeradorSlidesCientificos(minio=self.minio)
+        self.publicador = Publicador()
         self.heygen = HeyGenClient(
             api_key=cfg.heygen_api_key,
             talking_photo_id=cfg.heygen_talking_photo_id,

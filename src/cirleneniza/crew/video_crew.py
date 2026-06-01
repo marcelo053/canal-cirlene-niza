@@ -73,7 +73,7 @@ class VideoCrew:
         logger.info("VideoCrew: roteiro gerado")
 
         # Fase 3: Revisão
-        rev_result = self.revisor.execute(rot_result["script"])
+        rev_result = self.revisor.execute(rot_result["full_script"])
         logger.info(f"VideoCrew: revisão → {rev_result['status']}")
 
         # Fase 4: Narração ElevenLabs → MinIO
@@ -121,10 +121,11 @@ class VideoCrew:
             norm_key,
             7 * 24 * 3600,
         )
-        # presigned URL usa endpoint interno; substituir por IP público para HeyGen acessar
-        audio_url_for_heygen = audio_url_for_heygen.replace(
-            "localhost:9000", "186.202.209.88:9000"
-        ).replace("127.0.0.1:9000", "186.202.209.88:9000")
+        # presigned URL usa endpoint interno; substituir por endpoint público se configurado
+        internal_ep = cfg.minio_endpoint.removeprefix("http://").removeprefix("https://")
+        public_ep = (cfg.minio_public_endpoint or cfg.minio_endpoint).removeprefix("http://").removeprefix("https://")
+        if internal_ep != public_ep:
+            audio_url_for_heygen = audio_url_for_heygen.replace(internal_ep, public_ep)
         logger.info(f"VideoCrew: áudio normalizado em MinIO → {audio_url_for_heygen}")
 
         # Fase 7: HeyGen avatar → upload + download MP4
