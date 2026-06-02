@@ -51,6 +51,15 @@ class GeradorCenas:
             })
         return results
 
+    def _estimate_scene_duration(self, locutor: str) -> int:
+        """Estimate clip duration from LOCUTOR word count.
+
+        ~2.5 words/second for natural Portuguese speech.
+        Clamped to Kling 3.0 range: 5–15 seconds.
+        """
+        words = len(locutor.split())
+        return max(5, min(15, round(words / 2.5)))
+
     def generate_scene_videos(
         self,
         scene_images: list[dict],
@@ -59,19 +68,20 @@ class GeradorCenas:
         """Animate each scene image with Kling i2v using the CSMEA kling_motion_prompt."""
         videos = []
         num_scenes = len(scene_images)
-        duration_per_scene = 5  # fixed 5s — narration drives final cut length
 
         for scene in scene_images:
             # MUST use kling_motion_prompt (CSMEA) not a generic fallback
             kling_prompt = scene.get("kling_motion_prompt") or scene.get("prompt", "")
+            locutor = scene.get("locutor", "")
+            duration = self._estimate_scene_duration(locutor)
             logger.info(
                 f"GeradorCenas: video cena {scene['scene_index']+1}/{num_scenes}: "
-                f"{scene.get('scene_name', '')[:40]}"
+                f"{scene.get('scene_name', '')[:40]} ({duration}s)"
             )
             video = self.fal.generate_video(
                 image_url=scene["image_url"],
                 prompt=kling_prompt,
-                duration=duration_per_scene,
+                duration=duration,
                 aspect_ratio="9:16",
             )
             videos.append({

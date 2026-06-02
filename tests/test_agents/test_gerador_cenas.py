@@ -87,6 +87,29 @@ def test_generate_scene_videos_uses_kling_motion_prompt():
     assert used_prompt == "Slow zoom in. Cirlene smiles."
 
 
+def test_estimate_scene_duration_short_locutor():
+    agent = GeradorCenas.__new__(GeradorCenas)
+    # 10 words / 2.5 = 4s → clamp to 5
+    assert agent._estimate_scene_duration("palavra " * 10) == 5
+
+
+def test_estimate_scene_duration_medium_locutor():
+    agent = GeradorCenas.__new__(GeradorCenas)
+    # 20 words / 2.5 = 8s
+    assert agent._estimate_scene_duration("palavra " * 20) == 8
+
+
+def test_estimate_scene_duration_long_locutor():
+    agent = GeradorCenas.__new__(GeradorCenas)
+    # 50 words / 2.5 = 20s → clamp to 15
+    assert agent._estimate_scene_duration("palavra " * 50) == 15
+
+
+def test_estimate_scene_duration_empty_string():
+    agent = GeradorCenas.__new__(GeradorCenas)
+    assert agent._estimate_scene_duration("") == 5
+
+
 def test_apply_correction_appends_to_prompt():
     agent, mock_fal = _make_agent()
     current_data = {
