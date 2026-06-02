@@ -44,27 +44,28 @@ class DiretorDeArte:
         return {"logo_url": result["images"][0]["url"], "variant": variant}
 
     def generate_thumbnail(self, topic: str, prompt_override: str | None = None) -> dict:
-        """Gera thumbnail para vídeo específico."""
+        """Gera thumbnail com Flux /dev (qualidade) e HEX brand no prompt."""
         if prompt_override and len(prompt_override.strip()) > 30:
-            # prompt concreto do roteirista — enriquecer com estilo visual fixo
             prompt = (
                 f"{prompt_override.strip()}, "
-                "warm terracotta color palette, orange accent tones, "
+                "warm terracotta color palette, primary color #E07B39, "
+                "secondary #F5F0E8 cream background, "
                 "professional photography, sharp focus, vibrant, high contrast, "
-                "no text, no words, no letters, no captions"
+                "no text, no words, no letters, no captions, no watermarks"
             )
         else:
-            # fallback: prompt genérico baseado no tópico
             prompt = (
                 f"Professional YouTube thumbnail photo about {topic}, "
                 "food photography or lifestyle photography style, "
-                "warm terracotta and orange color palette (#E07B39 accents), "
+                "warm terracotta palette, primary color #E07B39, "
+                "secondary color #F5F0E8 cream background, "
                 "clean background, sharp focus, high contrast, inviting and vibrant, "
-                "no text, no words, no letters, no captions, photorealistic"
+                "no text, no words, no letters, no captions, no watermarks, photorealistic"
             )
-        logger.info(f"Diretor de Arte: gerando thumbnail para '{topic}'")
+        logger.info(f"Diretor de Arte: gerando thumbnail para '{topic}' (Flux /dev)")
         logger.debug(f"Thumbnail prompt: {prompt[:120]}...")
-        result = self.fal.generate(prompt, model="fal-ai/flux/schnell", aspect_ratio="16:9")
+        # flux/dev for quality — thumbnails are not time-sensitive
+        result = self.fal.generate(prompt, model="fal-ai/flux/dev", aspect_ratio="16:9")
         return {"thumbnail_url": result["images"][0]["url"], "topic": topic}
 
     def execute(self, task: str, context: dict | None = None) -> dict:
