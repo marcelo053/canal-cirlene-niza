@@ -101,3 +101,36 @@ def test_execute_aliases_enrich():
         agent = GeradorDePrompts()
         scenes = [{"scene": "C1"}]
         assert agent.execute(scenes) == agent.enrich(scenes)
+
+
+def test_kling_system_contains_negative_prompts():
+    from cirleneniza.agents.gerador_prompts import _SYSTEM
+    assert "Negative:" in _SYSTEM or "negative" in _SYSTEM.lower()
+    assert "motion blur" in _SYSTEM.lower()
+
+
+def test_kling_system_contains_motion_intensity():
+    from cirleneniza.agents.gerador_prompts import _SYSTEM
+    assert "motion_intensity" in _SYSTEM
+
+
+def test_enrich_scene_hook_includes_motion_intensity():
+    json_response = json.dumps({
+        "scene": "Cena 1: Hook",
+        "kling_motion_prompt": "Close-up shot, slow zoom in. motion_intensity=0.7. Protein powder. Vertical 9:16. Photorealistic. Cinematic 4K.",
+        "scene_type": "hook"
+    })
+    with patch("cirleneniza.agents.gerador_prompts.MiniMaxClient") as MockLLM:
+        MockLLM().generate.return_value = json_response
+        agent = GeradorDePrompts()
+        scene = {
+            "scene": "Cena 1",
+            "hook_technique": "myth_break",
+            "locutor": "Proteína não engorda.",
+            "nota_visual": "Pó",
+            "camera": "close-up",
+            "lighting": "soft",
+            "atmosphere": "inspiring",
+        }
+        result = agent.enrich_scene(scene)
+    assert result["scene_type"] == "hook"

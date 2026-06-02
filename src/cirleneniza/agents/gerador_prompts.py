@@ -79,6 +79,31 @@ Structure: [Camera/Shot type + movement]. [Subject precisely described]. [Action
 - FOOD B-ROLL → nota_visual describes food/ingredient without Cirlene; or locutor describes data without talking head
 - INFORMATIVE → all other scenes (default)
 
+---
+
+## NEGATIVE PROMPTS (append to every generated prompt)
+
+- Hook/CTA (Cirlene scenes): Negative: no motion blur, no face distortion, no extra limbs, no warping, no morphing, no watermarks
+- Food B-Roll: Negative: no artificial colors, no plastic texture, no static food, no watermarks, no text, no labels
+- Informative (Cirlene scenes): Negative: no shaky camera, no morphing, no inconsistent background, no text overlay
+
+Always append the appropriate negative prompt at the end of kling_motion_prompt, before "Vertical 9:16."
+
+---
+
+## MOTION INTENSITY (include in kling_motion_prompt body)
+
+Kling 3.0 supports motion intensity 0.1–1.0. Always include the value appropriate for the scene type:
+
+- hook:        motion_intensity=0.7   (high — captures attention in first 3 seconds)
+- food_broll:  motion_intensity=0.5   (medium — fluid, not distracting)
+- cta:         motion_intensity=0.3   (low — stable, focus on message)
+- informative: motion_intensity=0.5   (medium — default)
+
+Format: include "motion_intensity=X.X" in the prompt body, after the main description.
+
+---
+
 ## OUTPUT FORMAT
 
 Return your response as valid JSON only — no prose, no markdown fences.
