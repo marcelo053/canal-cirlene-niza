@@ -46,7 +46,6 @@ class ProduzirCrew:
         self.gerador_cenas = GeradorCenas()
         self.gerador_prompts = GeradorDePrompts()
         self.editor_video = EditorVideo(nca=NCAToolkitClient(cfg.nca_toolkit_url, api_key=cfg.nca_api_key))
-        self.gerador_slides = GeradorSlidesCientificos(minio=self.minio)
         self.publicador = Publicador()
         self.minio = MinIOClient(
             endpoint=cfg.minio_endpoint.removeprefix("http://"),
@@ -65,6 +64,7 @@ class ProduzirCrew:
             token=cfg.baserow_token,
         )
         self.tracker = CostTracker(self.baserow, cfg.baserow_table_costs)
+        self.gerador_slides = GeradorSlidesCientificos(minio=self.minio)
         self._cfg = cfg
 
     def run(self, session: dict) -> dict:

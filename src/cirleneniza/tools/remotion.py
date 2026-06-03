@@ -1,6 +1,7 @@
 """Remotion renderer — renders scientific slide compositions to MP4."""
 import json
 import subprocess
+import shutil
 import time
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from loguru import logger
 from cirleneniza.tools.minio import MinIOClient
 
 _REMOTION_PROJECT = Path(__file__).resolve().parents[3] / "slides-cientificos"
-_NPX = Path.home() / ".nvm/versions/node/v24.14.0/bin/npx"
+_NPX = Path(shutil.which("npx") or "/usr/bin/npx")
 _OUTPUT_DIR = Path("/tmp/remotion-slides")
 
 # Maps composition ID → expected duration in frames (at 30fps)
