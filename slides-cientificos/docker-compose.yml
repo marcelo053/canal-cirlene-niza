@@ -1,0 +1,17 @@
+services:
+  staging:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=staging
+    volumes:
+      - ./src:/app/src
+
+  production:
+    build: .
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+    command: npm run dev -- --port 3000 --host
