@@ -1,0 +1,95 @@
+services:
+
+  # ─── MinIO local storage ─────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: cirlene-minio-staging
+    command: server /data --console-address ":9090"
+    ports:
+      - "9001:9000"   # S3 API  (VPS usa 9000)
+      - "9091:9090"   # Console UI
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - ./data/minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── MinIO bucket init ────────────────────────────────────────────
+  minio-init:
+    image: minio/mc:latest
+    container_name: cirlene-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./minio-init/init.sh:/init.sh
+    entrypoint: ["/bin/sh", "/init.sh"]
+    restart: "no"
+
+  # ─── n8n workflow engine ─────────────────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: cirlene-n8n-staging
+    ports:
+      - "5679:5678"   # UI  (VPS usa 5678)
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: "false"
+      WEBHOOK_URL: ${WEBHOOK_URL}
+      FAL_KEY: ${FAL_KEY}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: "9000"
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      CIRLENE_REF_1: ${CIRLENE_REF_1}
+      CIRLENE_REF_2: ${CIRLENE_REF_2}
+      CIRLENE_REF_3: ${CIRLENE_REF_3}
+      RENDERER_URL: http://renderer:3000
+      MONTAGEM_URL: http://montagem:3000
+      N8N_RUNNERS_ENABLED: "true"
+    volumes:
+      - ./data/n8n:/home/node/.n8n
+
+  # ─── Remotion renderer service ────────────────────────────────────
+  renderer:
+    build: ./renderer
+    container_name: cirlene-renderer-staging
+    ports:
+      - "3001:3000"
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      SLIDES_DIR: /slides
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: "9000"
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: cirlene-slides
+      CHROME_EXECUTABLE_PATH: /usr/bin/chromium
+      REMOTION_CACHE_DIR: /tmp/remotion-cache
+    volumes:
+      - ../slides-cientificos:/slides:ro
+    shm_size: "1gb"
+
+  # ─── Montagem (ffmpeg concat + upload) ──────────────────────────
+  montagem:
+    build: ./montagem
+    container_name: cirlene-montagem-staging
+    ports:
+      - "3002:3000"
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: "9000"
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
