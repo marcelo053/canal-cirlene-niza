@@ -1,0 +1,28 @@
+{
+  "name": "slides-cientificos",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.ts",
+  "scripts": {
+    "studio": "npx remotion studio src/index.ts",
+    "render": "node render.mjs",
+    "render:test": "node render.mjs --props '{\"layout\":\"StatCard\",\"stat\":\"73%\",\"description\":\"dos adultos têm deficiência de vitamina D\",\"source\":\"Journal of Nutrition, 2024\",\"topic\":\"NUTRIÇÃO\"}' --out out/test-statcard.mp4"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@remotion/cli": "^4.0.473",
+    "@remotion/renderer": "^4.0.473",
+    "gsap": "^3.15.0",
+    "remotion": "^4.0.473"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.16",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^6.0.3"
+  }
+}
