@@ -1,0 +1,19 @@
+{
+  "name": "cirlene-renderer",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "minio": "^8.0.5",
+    "remotion": "^4.0.473",
+    "@remotion/bundler": "^4.0.473",
+    "@remotion/renderer": "^4.0.473",
+    "@remotion/cli": "^4.0.473",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}
