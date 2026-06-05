@@ -1,0 +1,54 @@
+{
+  "name": "montagem-staging-cirl",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "montagem-staging-cirl",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh-montagem-001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Monta vídeo final: intro + slides + outro\n// Input:\n// {\n//   production_id: string\n//   intro_url: string        (URL pública ou MinIO presigned)\n//   slide_urls: string[]    (em ordem)\n//   outro_url: string\n// }\n\nconst MONTAGEM = $env.MONTAGEM_URL || 'http://montagem:3000';\n\nconst body = $input.first().json.body || $input.first().json;\nconst pid  = body.production_id;\n\nconst clips = [\n  body.intro_url,\n  ...(body.slide_urls || []),\n  body.outro_url,\n].filter(Boolean);\n\nif (clips.length < 2) throw new Error('Mínimo 2 clips para montar');\n\nconsole.log(`[${pid}] Montando ${clips.length} clips...`);\n\nconst r = await fetch(`${MONTAGEM}/concat`, {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    production_id: pid,\n    clips,\n    output_bucket: 'cirlene-video',\n    output_key: `${pid}/final.mp4`,\n  }),\n});\n\nif (!r.ok) {\n  const err = await r.text();\n  throw new Error(`Montagem falhou: ${r.status} ${err}`);\n}\n\nconst result = await r.json();\nconsole.log(`[${pid}] Final: ${result.path}`);\n\nreturn [{\n  json: {\n    production_id: pid,\n    final_path: result.path,\n    final_url:  result.url,\n    clip_count: clips.length,\n  }\n}];"
+      },
+      "id": "code-montagem-001",
+      "name": "Montar Vídeo Final",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "resp-montagem-001",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [760, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Montar Vídeo Final", "type": "main", "index": 0 }]]
+    },
+    "Montar Vídeo Final": {
+      "main": [[{ "node": "Responder", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timeout": 600
+  }
+}

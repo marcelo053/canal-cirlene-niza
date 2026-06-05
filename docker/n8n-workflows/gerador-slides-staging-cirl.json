@@ -1,0 +1,54 @@
+{
+  "name": "gerador-slides-staging-cirl",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gerador-slides-staging-cirl",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh-slides-001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Renderiza slides científicos via renderer service\n// Input: { production_id, scenes: [{ layout, ...props }] }\n\nconst RENDERER = $env.RENDERER_URL || 'http://renderer:3000';\n\nconst body  = $input.first().json.body || $input.first().json;\nconst pid   = body.production_id;\nconst scenes = body.scenes || [];\n\nif (!scenes.length) throw new Error('scenes[] is required');\n\nconst results = [];\n\nfor (let i = 0; i < scenes.length; i++) {\n  const props = scenes[i];\n  const outputName = `${pid}-slide-${i}.mp4`;\n  \n  console.log(`[${pid}] Rendering slide ${i}: ${props.layout}`);\n  \n  const r = await fetch(`${RENDERER}/render`, {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ props, output: outputName }),\n  });\n  \n  if (!r.ok) {\n    const err = await r.text();\n    throw new Error(`Slide ${i} render failed: ${r.status} ${err}`);\n  }\n  \n  const result = await r.json();\n  console.log(`[${pid}] Slide ${i} done: ${result.path}`);\n  results.push(result);\n}\n\nreturn [{\n  json: {\n    production_id: pid,\n    slide_count: results.length,\n    slides: results.map((r, i) => ({\n      index: i,\n      path: r.path,\n      url:  r.url,\n    })),\n  }\n}];"
+      },
+      "id": "code-slides-001",
+      "name": "Renderizar Slides",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "resp-slides-001",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [760, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Renderizar Slides", "type": "main", "index": 0 }]]
+    },
+    "Renderizar Slides": {
+      "main": [[{ "node": "Responder", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timeout": 600
+  }
+}
