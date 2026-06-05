@@ -130,4 +130,38 @@ app.post("/concat", async (req, res) => {
   }
 });
 
+/**
+ * POST /upload-from-url
+ * { url: "https://...", bucket: "cirlene-video", key: "prod-001/intro.mp4" }
+ * → { ok: true, path: "minio://bucket/key", url: "<presigned 7d>" }
+ */
+app.post("/upload-from-url", async (req, res) => {
+  const { url, bucket, key } = req.body;
+  if (!url || !bucket || !key) {
+    return res.status(400).json({ error: "url, bucket, key required" });
+  }
+
+  const id = randomUUID();
+  const tmpFile = join(tmpdir(), `upload-${id}.mp4`);
+
+  try {
+    console.log(`  Downloading ${url} → ${tmpFile}`);
+    await download(url, tmpFile);
+
+    const exists = await minio.bucketExists(bucket);
+    if (!exists) await minio.makeBucket(bucket);
+
+    await minio.fPutObject(bucket, key, tmpFile, { "content-type": "video/mp4" });
+
+    const presigned = await minio.presignedGetObject(bucket, key, 7 * 24 * 3600);
+
+    res.json({ ok: true, path: `minio://${bucket}/${key}`, url: presigned });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: String(err) });
+  } finally {
+    try { unlinkSync(tmpFile); } catch (_) {}
+  }
+});
+
 app.listen(PORT, () => console.log(`Montagem service :${PORT}`));

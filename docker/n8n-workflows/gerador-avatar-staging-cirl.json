@@ -1,0 +1,54 @@
+{
+  "name": "gerador-avatar-staging-cirl",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gerador-avatar-staging-cirl",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh-avatar-001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gera intro + outro para a Cirlene via fal.ai Veo 3.1\n// Input: { production_id, intro_prompt, outro_prompt }\n\nconst FAL_KEY   = $env.FAL_KEY;\nconst MONTAGEM  = $env.MONTAGEM_URL || 'http://montagem:3000';\nconst REF_IMGS  = [\n  $env.CIRLENE_REF_1,\n  $env.CIRLENE_REF_2,\n  $env.CIRLENE_REF_3,\n].filter(Boolean);\n\nconst body      = $input.first().json.body || $input.first().json;\nconst pid       = body.production_id;\nconst introText = body.intro_prompt;\nconst outroText = body.outro_prompt;\n\nconst sleep = ms => new Promise(r => setTimeout(r, ms));\n\nasync function submitFal(prompt) {\n  const resp = await fetch('https://queue.fal.run/fal-ai/veo3.1/reference-to-video', {\n    method: 'POST',\n    headers: {\n      'Authorization': `Key ${FAL_KEY}`,\n      'Content-Type': 'application/json',\n    },\n    body: JSON.stringify({\n      prompt,\n      image_urls: REF_IMGS,\n      aspect_ratio: '9:16',\n      generate_audio: true,\n      resolution: '720p',\n    }),\n  });\n  if (!resp.ok) throw new Error(`fal submit failed: ${resp.status} ${await resp.text()}`);\n  return (await resp.json()).request_id;\n}\n\nasync function pollFal(requestId) {\n  const base = 'https://queue.fal.run/fal-ai/veo3.1';\n  for (let i = 0; i < 30; i++) {\n    await sleep(15_000);\n    const r = await fetch(`${base}/requests/${requestId}/status`, {\n      headers: { 'Authorization': `Key ${FAL_KEY}` },\n    });\n    const data = await r.json();\n    if (data.status === 'COMPLETED') {\n      const res = await fetch(`${base}/requests/${requestId}`, {\n        headers: { 'Authorization': `Key ${FAL_KEY}` },\n      });\n      return (await res.json()).video?.url;\n    }\n    if (data.status === 'FAILED') throw new Error('fal job failed: ' + JSON.stringify(data));\n  }\n  throw new Error('fal polling timeout after 7.5min');\n}\n\nasync function uploadToMinio(falUrl, bucket, key) {\n  const r = await fetch(`${MONTAGEM}/upload-from-url`, {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ url: falUrl, bucket, key }),\n  });\n  if (!r.ok) throw new Error(`upload failed: ${r.status} ${await r.text()}`);\n  return await r.json();\n}\n\n// --- Intro ---\nconsole.log(`[${pid}] Submitting INTRO to fal.ai...`);\nconst introId  = await submitFal(introText);\nconsole.log(`[${pid}] INTRO request_id: ${introId}`);\nconst introFalUrl = await pollFal(introId);\nconsole.log(`[${pid}] INTRO fal URL: ${introFalUrl}`);\nconst introResult = await uploadToMinio(introFalUrl, 'cirlene-video', `${pid}/intro.mp4`);\n\n// --- Outro ---\nconsole.log(`[${pid}] Submitting OUTRO to fal.ai...`);\nconst outroId  = await submitFal(outroText);\nconsole.log(`[${pid}] OUTRO request_id: ${outroId}`);\nconst outroFalUrl = await pollFal(outroId);\nconsole.log(`[${pid}] OUTRO fal URL: ${outroFalUrl}`);\nconst outroResult = await uploadToMinio(outroFalUrl, 'cirlene-video', `${pid}/outro.mp4`);\n\nreturn [{\n  json: {\n    production_id: pid,\n    intro_path: introResult.path,\n    intro_url:  introResult.url,\n    outro_path: outroResult.path,\n    outro_url:  outroResult.url,\n  }\n}];"
+      },
+      "id": "code-avatar-001",
+      "name": "Gerar Avatar (intro + outro)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "resp-avatar-001",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [760, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Gerar Avatar (intro + outro)", "type": "main", "index": 0 }]]
+    },
+    "Gerar Avatar (intro + outro)": {
+      "main": [[{ "node": "Responder", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timeout": 600
+  }
+}
