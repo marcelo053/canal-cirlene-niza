@@ -78,3 +78,26 @@ done
 
 echo ""
 echo "✓ Workflows importados: ${N8N_URL}/workflows"
+echo ""
+echo "→ Aplicando fix no DB (n8n 2.x published versions)..."
+python3 "${SCRIPT_DIR}/fix-n8n-db.py"
+echo ""
+echo "→ Reativando workflows..."
+for ID in $(curl -s "${API}/workflows" -H "X-N8N-API-KEY: ${API_KEY}" | \
+    python3 -c "import sys,json; [print(w['id']) for w in json.load(sys.stdin).get('data',[])]" 2>/dev/null); do
+  curl -s -X POST "${API}/workflows/${ID}/deactivate" -H "X-N8N-API-KEY: ${API_KEY}" > /dev/null
+  sleep 0.5
+  curl -s -X POST "${API}/workflows/${ID}/activate"   -H "X-N8N-API-KEY: ${API_KEY}" > /dev/null
+  echo "   ✓ activated ${ID}"
+done
+echo ""
+echo "✓ Setup completo. Webhooks disponíveis em:"
+curl -s "${API}/workflows" -H "X-N8N-API-KEY: ${API_KEY}" | \
+  python3 -c "
+import sys,json
+for w in json.load(sys.stdin).get('data',[]):
+    for node in w.get('nodes',[]):
+        if node.get('type') == 'n8n-nodes-base.webhook':
+            path = node['parameters'].get('path','')
+            print(f'  POST ${N8N_URL}/webhook/{w[\"id\"]}/webhook/{path}')
+" 2>/dev/null || true

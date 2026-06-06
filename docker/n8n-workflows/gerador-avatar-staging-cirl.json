@@ -5,45 +5,50 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "gerador-avatar-staging-cirl",
-        "responseMode": "responseNode",
-        "options": {}
+        "responseMode": "onReceived",
+        "options": {},
+        "responseData": "noData"
       },
       "id": "wh-avatar-001",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 300]
+      "position": [
+        240,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Gera intro + outro para a Cirlene via fal.ai Veo 3.1\n// Input: { production_id, intro_prompt, outro_prompt }\n\nconst FAL_KEY   = $env.FAL_KEY;\nconst MONTAGEM  = $env.MONTAGEM_URL || 'http://montagem:3000';\nconst REF_IMGS  = [\n  $env.CIRLENE_REF_1,\n  $env.CIRLENE_REF_2,\n  $env.CIRLENE_REF_3,\n].filter(Boolean);\n\nconst body      = $input.first().json.body || $input.first().json;\nconst pid       = body.production_id;\nconst introText = body.intro_prompt;\nconst outroText = body.outro_prompt;\n\nconst sleep = ms => new Promise(r => setTimeout(r, ms));\n\nasync function submitFal(prompt) {\n  const resp = await fetch('https://queue.fal.run/fal-ai/veo3.1/reference-to-video', {\n    method: 'POST',\n    headers: {\n      'Authorization': `Key ${FAL_KEY}`,\n      'Content-Type': 'application/json',\n    },\n    body: JSON.stringify({\n      prompt,\n      image_urls: REF_IMGS,\n      aspect_ratio: '9:16',\n      generate_audio: true,\n      resolution: '720p',\n    }),\n  });\n  if (!resp.ok) throw new Error(`fal submit failed: ${resp.status} ${await resp.text()}`);\n  return (await resp.json()).request_id;\n}\n\nasync function pollFal(requestId) {\n  const base = 'https://queue.fal.run/fal-ai/veo3.1';\n  for (let i = 0; i < 30; i++) {\n    await sleep(15_000);\n    const r = await fetch(`${base}/requests/${requestId}/status`, {\n      headers: { 'Authorization': `Key ${FAL_KEY}` },\n    });\n    const data = await r.json();\n    if (data.status === 'COMPLETED') {\n      const res = await fetch(`${base}/requests/${requestId}`, {\n        headers: { 'Authorization': `Key ${FAL_KEY}` },\n      });\n      return (await res.json()).video?.url;\n    }\n    if (data.status === 'FAILED') throw new Error('fal job failed: ' + JSON.stringify(data));\n  }\n  throw new Error('fal polling timeout after 7.5min');\n}\n\nasync function uploadToMinio(falUrl, bucket, key) {\n  const r = await fetch(`${MONTAGEM}/upload-from-url`, {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({ url: falUrl, bucket, key }),\n  });\n  if (!r.ok) throw new Error(`upload failed: ${r.status} ${await r.text()}`);\n  return await r.json();\n}\n\n// --- Intro ---\nconsole.log(`[${pid}] Submitting INTRO to fal.ai...`);\nconst introId  = await submitFal(introText);\nconsole.log(`[${pid}] INTRO request_id: ${introId}`);\nconst introFalUrl = await pollFal(introId);\nconsole.log(`[${pid}] INTRO fal URL: ${introFalUrl}`);\nconst introResult = await uploadToMinio(introFalUrl, 'cirlene-video', `${pid}/intro.mp4`);\n\n// --- Outro ---\nconsole.log(`[${pid}] Submitting OUTRO to fal.ai...`);\nconst outroId  = await submitFal(outroText);\nconsole.log(`[${pid}] OUTRO request_id: ${outroId}`);\nconst outroFalUrl = await pollFal(outroId);\nconsole.log(`[${pid}] OUTRO fal URL: ${outroFalUrl}`);\nconst outroResult = await uploadToMinio(outroFalUrl, 'cirlene-video', `${pid}/outro.mp4`);\n\nreturn [{\n  json: {\n    production_id: pid,\n    intro_path: introResult.path,\n    intro_url:  introResult.url,\n    outro_path: outroResult.path,\n    outro_url:  outroResult.url,\n  }\n}];"
+        "jsCode": "const https = require('https');\nconst http  = require('http');\n\nconst FAL_KEY  = \"443a6432-3b5b-4abe-a925-a6336817f13f:70f93e62dbc7def11558314850ea375c\";\nconst MONTAGEM_HOST = 'montagem';\nconst MONTAGEM_PORT = 3000;\nconst REF_IMGS = [\n  \"https://v3b.fal.media/files/b/0a9d190b/eJgcWqX9t4DJ2Ypx_1InI_IMG_3628.JPG\",\n  \"https://v3b.fal.media/files/b/0a9d190d/MPANCIXNZroF4MEj3lQhq_IMG_3629.JPG\",\n  \"https://v3b.fal.media/files/b/0a9d1911/2agE2ANEpIiKnJWbYge44_IMG_3631.JPG\"\n];\n\nconst body      = $input.first().json.body || $input.first().json;\nconst pid       = body.production_id;\nconst introText = body.intro_prompt;\nconst outroText = body.outro_prompt;\n\nconst sleep = ms => new Promise(r => setTimeout(r, ms));\n\nfunction httpsReq(method, hostname, path, hdrs, payload) {\n  return new Promise((resolve, reject) => {\n    const data = payload ? JSON.stringify(payload) : null;\n    const opts = {\n      hostname, path, method,\n      headers: { ...hdrs, ...(data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {}) }\n    };\n    const req = https.request(opts, res => {\n      let body = '';\n      res.on('data', c => body += c);\n      res.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { resolve({ raw: body }); } });\n    });\n    req.on('error', reject);\n    if (data) req.write(data);\n    req.end();\n  });\n}\n\nfunction httpPost(host, port, path, payload) {\n  return new Promise((resolve, reject) => {\n    const data = JSON.stringify(payload);\n    const opts = {\n      hostname: host, port, path, method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }\n    };\n    const req = http.request(opts, res => {\n      let body = '';\n      res.on('data', c => body += c);\n      res.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { resolve({ raw: body }); } });\n    });\n    req.on('error', reject);\n    req.write(data);\n    req.end();\n  });\n}\n\nconst AUTH = { 'Authorization': `Key ${FAL_KEY}` };\n\nasync function submitFal(prompt) {\n  const r = await httpsReq('POST', 'queue.fal.run', '/fal-ai/veo3.1/reference-to-video', AUTH, {\n    prompt, image_urls: REF_IMGS, aspect_ratio: '9:16', generate_audio: true, resolution: '720p'\n  });\n  if (!r.request_id) throw new Error('fal submit failed: ' + JSON.stringify(r));\n  return r.request_id;\n}\n\nasync function pollFal(requestId) {\n  for (let i = 0; i < 40; i++) {\n    await sleep(15000);\n    const s = await httpsReq('GET', 'queue.fal.run', `/fal-ai/veo3.1/requests/${requestId}/status`, AUTH, null);\n    console.log(`[${pid}] poll ${i+1}: ${s.status}`);\n    if (s.status === 'COMPLETED') {\n      const res = await httpsReq('GET', 'queue.fal.run', `/fal-ai/veo3.1/requests/${requestId}`, AUTH, null);\n      console.log(`[${pid}] result keys: ${Object.keys(res).join(', ')}`);\n      // fal may return video in different fields\n      const videoUrl = res.video?.url || res.videos?.[0]?.url || res.output?.video?.url || res.output?.url;\n      if (!videoUrl) throw new Error('fal completed but no video URL. Keys: ' + Object.keys(res).join(', ') + ' | sample: ' + JSON.stringify(res).slice(0, 300));\n      return videoUrl;\n    }\n    if (s.status === 'FAILED') throw new Error('fal job failed: ' + JSON.stringify(s));\n  }\n  throw new Error('fal polling timeout after 10min');\n}\n\nasync function uploadToMinio(falUrl, bucket, key) {\n  const r = await httpPost(MONTAGEM_HOST, MONTAGEM_PORT, '/upload-from-url', { url: falUrl, bucket, key });\n  if (r.error) throw new Error('upload failed: ' + r.error);\n  return r;\n}\n\n// --- Intro ---\nconsole.log(`[${pid}] Submitting INTRO...`);\nconst introId = await submitFal(introText);\nconsole.log(`[${pid}] INTRO request_id: ${introId}`);\nconst introFalUrl = await pollFal(introId);\nconsole.log(`[${pid}] INTRO url: ${introFalUrl}`);\nconst introResult = await uploadToMinio(introFalUrl, 'cirlene-video', `${pid}/intro.mp4`);\n\n// --- Outro ---\nconsole.log(`[${pid}] Submitting OUTRO...`);\nconst outroId = await submitFal(outroText);\nconsole.log(`[${pid}] OUTRO request_id: ${outroId}`);\nconst outroFalUrl = await pollFal(outroId);\nconsole.log(`[${pid}] OUTRO url: ${outroFalUrl}`);\nconst outroResult = await uploadToMinio(outroFalUrl, 'cirlene-video', `${pid}/outro.mp4`);\n\nreturn [{ json: {\n  production_id: pid,\n  intro_path: introResult.path, intro_url: introResult.url,\n  outro_path: outroResult.path, outro_url: outroResult.url,\n} }];"
       },
       "id": "code-avatar-001",
       "name": "Gerar Avatar (intro + outro)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [500, 300],
+      "position": [
+        500,
+        300
+      ],
       "executeOnce": true
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ $json }}",
-        "options": {}
-      },
-      "id": "resp-avatar-001",
-      "name": "Responder",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [760, 300]
     }
   ],
   "connections": {
     "Webhook": {
-      "main": [[{ "node": "Gerar Avatar (intro + outro)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Gerar Avatar (intro + outro)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Gerar Avatar (intro + outro)": {
-      "main": [[{ "node": "Responder", "type": "main", "index": 0 }]]
+      "main": [
+        []
+      ]
     }
   },
   "active": true,

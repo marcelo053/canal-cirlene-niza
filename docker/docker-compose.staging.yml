@@ -54,7 +54,9 @@ services:
       CIRLENE_REF_3: ${CIRLENE_REF_3}
       RENDERER_URL: http://renderer:3000
       MONTAGEM_URL: http://montagem:3000
-      N8N_RUNNERS_ENABLED: "true"
+      N8N_RUNNERS_ENABLED: "false"
+      NODE_FUNCTION_ALLOW_BUILTIN: "*"
+      NODE_FUNCTION_ALLOW_EXTERNAL: "*"
     volumes:
       - ./data/n8n:/home/node/.n8n
 

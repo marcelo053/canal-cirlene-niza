@@ -5,45 +5,50 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "montagem-staging-cirl",
-        "responseMode": "responseNode",
-        "options": {}
+        "responseMode": "onReceived",
+        "options": {},
+        "responseData": "noData"
       },
       "id": "wh-montagem-001",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 300]
+      "position": [
+        240,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// Monta vídeo final: intro + slides + outro\n// Input:\n// {\n//   production_id: string\n//   intro_url: string        (URL pública ou MinIO presigned)\n//   slide_urls: string[]    (em ordem)\n//   outro_url: string\n// }\n\nconst MONTAGEM = $env.MONTAGEM_URL || 'http://montagem:3000';\n\nconst body = $input.first().json.body || $input.first().json;\nconst pid  = body.production_id;\n\nconst clips = [\n  body.intro_url,\n  ...(body.slide_urls || []),\n  body.outro_url,\n].filter(Boolean);\n\nif (clips.length < 2) throw new Error('Mínimo 2 clips para montar');\n\nconsole.log(`[${pid}] Montando ${clips.length} clips...`);\n\nconst r = await fetch(`${MONTAGEM}/concat`, {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    production_id: pid,\n    clips,\n    output_bucket: 'cirlene-video',\n    output_key: `${pid}/final.mp4`,\n  }),\n});\n\nif (!r.ok) {\n  const err = await r.text();\n  throw new Error(`Montagem falhou: ${r.status} ${err}`);\n}\n\nconst result = await r.json();\nconsole.log(`[${pid}] Final: ${result.path}`);\n\nreturn [{\n  json: {\n    production_id: pid,\n    final_path: result.path,\n    final_url:  result.url,\n    clip_count: clips.length,\n  }\n}];"
+        "jsCode": "// Concatena intro + slides + outro via montagem service\nconst http = require('http');\n\nconst MONTAGEM_HOST = 'montagem';\nconst MONTAGEM_PORT = 3000;\n\nconst body      = $input.first().json.body || $input.first().json;\nconst pid       = body.production_id;\nconst introUrl  = body.intro_url;\nconst slideUrls = body.slide_urls || [];\nconst outroUrl  = body.outro_url;\n\nconst clips = [introUrl, ...slideUrls, outroUrl].filter(Boolean);\nif (clips.length < 2) throw new Error('precisa de pelo menos intro + 1 slide');\n\nconsole.log(`[${pid}] Montando ${clips.length} clips...`);\n\nfunction httpPost(host, port, path, payload) {\n  return new Promise((resolve, reject) => {\n    const data = JSON.stringify(payload);\n    const options = {\n      hostname: host, port, path, method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }\n    };\n    const req = http.request(options, res => {\n      let body = '';\n      res.on('data', c => body += c);\n      res.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { resolve({ raw: body }); } });\n    });\n    req.on('error', reject);\n    req.write(data);\n    req.end();\n  });\n}\n\nconst r = await httpPost(MONTAGEM_HOST, MONTAGEM_PORT, '/concat', {\n  clips,\n  output: `${pid}/final.mp4`,\n  bucket: 'cirlene-video',\n});\n\nif (r.error) throw new Error('montagem failed: ' + r.error);\nconsole.log(`[${pid}] Montagem done: ${r.path}`);\n\nreturn [{ json: { production_id: pid, final_path: r.path, final_url: r.url } }];"
       },
       "id": "code-montagem-001",
       "name": "Montar Vídeo Final",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [500, 300],
+      "position": [
+        500,
+        300
+      ],
       "executeOnce": true
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ $json }}",
-        "options": {}
-      },
-      "id": "resp-montagem-001",
-      "name": "Responder",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [760, 300]
     }
   ],
   "connections": {
     "Webhook": {
-      "main": [[{ "node": "Montar Vídeo Final", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Montar Vídeo Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Montar Vídeo Final": {
-      "main": [[{ "node": "Responder", "type": "main", "index": 0 }]]
+      "main": [
+        []
+      ]
     }
   },
   "active": true,
