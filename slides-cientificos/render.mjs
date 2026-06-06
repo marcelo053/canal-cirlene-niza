@@ -63,11 +63,7 @@ const bundleLocation = await bundle({
   entryPoint: path.join(__dirname, "src/index.ts"),
   webpackOverride: (config) => ({
     ...config,
-    cache: {
-      ...config.cache,
-      type: "filesystem",
-      cacheDirectory: path.join(CACHE_DIR, "webpack"),
-    },
+    cache: false,
   }),
   outDir: path.join(CACHE_DIR, "bundle"),
 });

@@ -57,6 +57,8 @@ services:
       N8N_RUNNERS_ENABLED: "false"
       NODE_FUNCTION_ALLOW_BUILTIN: "*"
       NODE_FUNCTION_ALLOW_EXTERNAL: "*"
+      EXECUTIONS_TIMEOUT: 900
+      EXECUTIONS_TIMEOUT_MAX: 900
     volumes:
       - ./data/n8n:/home/node/.n8n
 

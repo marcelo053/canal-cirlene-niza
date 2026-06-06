@@ -26,9 +26,10 @@ DB_PATH = SCRIPT_DIR / "data/n8n/database.sqlite"
 WORKFLOWS_DIR = SCRIPT_DIR / "n8n-workflows"
 
 WORKFLOW_MAP = {
-    "gerador-avatar-staging-cirl":  None,  # preenchido abaixo
-    "gerador-slides-staging-cirl":  None,
-    "montagem-staging-cirl":        None,
+    "gerador-avatar-staging-cirl":    None,  # preenchido abaixo
+    "gerador-slides-staging-cirl":    None,
+    "montagem-staging-cirl":          None,
+    "roteirista-staging-cirl":        None,
 }
 
 
