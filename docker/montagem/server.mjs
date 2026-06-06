@@ -62,10 +62,18 @@ async function download(url, dest) {
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
 app.post("/concat", async (req, res) => {
-  const { production_id, clips, output_bucket, output_key } = req.body;
+  const { production_id, segments, clips, output_bucket, output_key } = req.body;
 
-  if (!clips?.length || !output_bucket || !output_key) {
+  if (!output_bucket || !output_key) {
     return res.status(400).json({ error: "clips[], output_bucket, output_key required" });
+  }
+
+  // Support both legacy clips[] and new segments[] format
+  const hasSegments = Array.isArray(segments) && segments.length > 0;
+  const hasAudio = hasSegments && segments.some(s => s.audio);
+
+  if (!hasSegments && !clips?.length) {
+    return res.status(400).json({ error: "clips[] or segments[] required" });
   }
 
   const id = production_id || randomUUID();
@@ -73,60 +81,139 @@ app.post("/concat", async (req, res) => {
   const { mkdirSync } = await import("fs");
   mkdirSync(workDir, { recursive: true });
 
-  const localClips = [];
+  const tempFiles = [];
 
   try {
-    // 1. Download all clips
-    for (let i = 0; i < clips.length; i++) {
-      const dest = join(workDir, `clip-${i}.mp4`);
-      console.log(`  Downloading clip ${i}: ${clips[i]}`);
-      await download(clips[i], dest);
-      localClips.push(dest);
+    if (hasAudio) {
+      // ── New path: segments with per-clip audio overlay ──────────────
+      console.log(`[${id}] Segments mode: ${segments.length} segments with audio overlay`);
+
+      // 1. Download each video + audio, apply audio overlay per segment
+      const segFiles = [];
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        const videoPath = join(workDir, `seg-${i}-video.mp4`);
+        console.log(`  [${i}] Downloading video: ${seg.video}`);
+        await download(seg.video, videoPath);
+        tempFiles.push(videoPath);
+
+        if (seg.audio) {
+          const audioPath = join(workDir, `seg-${i}-audio.mp3`);
+          console.log(`  [${i}] Downloading audio: ${seg.audio}`);
+          await download(seg.audio, audioPath);
+          tempFiles.push(audioPath);
+
+          // ffmpeg: overlay audio, optionally mute original video audio
+          const mixedPath = join(workDir, `seg-${i}-mixed.mp4`);
+          tempFiles.push(mixedPath);
+
+          // Both cases: replace/add TTS audio, discard original video audio
+          // -filter_complex pads TTS to video length; -map picks video + padded audio
+          const ffCmd = [
+            "ffmpeg -y",
+            `-i "${videoPath}"`,
+            `-i "${audioPath}"`,
+            `-filter_complex "[1:a]apad[aout]"`,
+            `-map 0:v -map "[aout]"`,
+            `-c:v copy`,
+            `-c:a aac -b:a 192k`,
+            `-shortest`,
+            `-movflags +faststart`,
+            `"${mixedPath}"`,
+          ].join(" ");
+          await execAsync(ffCmd, { timeout: 120_000 });
+          segFiles.push(mixedPath);
+        } else {
+          // No audio override — use video as-is (re-encode to ensure consistent streams)
+          const normPath = join(workDir, `seg-${i}-norm.mp4`);
+          tempFiles.push(normPath);
+          const ffCmd = [
+            "ffmpeg -y",
+            `-i "${videoPath}"`,
+            `-an -c:v copy`,
+            `"${normPath}"`,
+          ].join(" ");
+          await execAsync(ffCmd, { timeout: 60_000 });
+          segFiles.push(normPath);
+        }
+      }
+
+      // 2. Concat all processed segments
+      const listFile = join(workDir, "list.txt");
+      writeFileSync(listFile, segFiles.map(p => `file '${p}'`).join("\n"));
+      tempFiles.push(listFile);
+
+      const outFile = join(workDir, "final.mp4");
+      tempFiles.push(outFile);
+      const concatCmd = [
+        "ffmpeg -y",
+        `-f concat -safe 0 -i "${listFile}"`,
+        `-vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black"`,
+        `-c:v libx264 -preset fast -crf 22`,
+        `-c:a aac -b:a 192k`,
+        `-movflags +faststart`,
+        `"${outFile}"`,
+      ].join(" ");
+
+      console.log(`  Concatenating ${segFiles.length} processed segments...`);
+      await execAsync(concatCmd, { timeout: 300_000 });
+
+      // 3. Upload
+      const bucket = output_bucket;
+      const exists = await minio.bucketExists(bucket);
+      if (!exists) await minio.makeBucket(bucket);
+      await minio.fPutObject(bucket, output_key, outFile, { "content-type": "video/mp4" });
+      const presigned = await minio.presignedGetObject(bucket, output_key, 7 * 24 * 3600);
+      res.json({ ok: true, path: `minio://${bucket}/${output_key}`, url: presigned });
+
+    } else {
+      // ── Legacy path: simple clips[] concat ─────────────────────────
+      const clipList = hasSegments ? segments.map(s => s.video) : clips;
+      console.log(`[${id}] Simple concat: ${clipList.length} clips`);
+
+      const localClips = [];
+      for (let i = 0; i < clipList.length; i++) {
+        const dest = join(workDir, `clip-${i}.mp4`);
+        console.log(`  Downloading clip ${i}: ${clipList[i]}`);
+        await download(clipList[i], dest);
+        localClips.push(dest);
+        tempFiles.push(dest);
+      }
+
+      const listFile = join(workDir, "list.txt");
+      writeFileSync(listFile, localClips.map(p => `file '${p}'`).join("\n"));
+      tempFiles.push(listFile);
+
+      const outFile = join(workDir, "final.mp4");
+      tempFiles.push(outFile);
+      const ffCmd = [
+        "ffmpeg -y",
+        `-f concat -safe 0 -i "${listFile}"`,
+        `-vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black"`,
+        `-c:v libx264 -preset fast -crf 22`,
+        `-c:a aac -b:a 192k`,
+        `-movflags +faststart`,
+        `"${outFile}"`,
+      ].join(" ");
+
+      console.log(`  Running ffmpeg concat...`);
+      await execAsync(ffCmd, { timeout: 300_000 });
+
+      const bucket = output_bucket;
+      const exists = await minio.bucketExists(bucket);
+      if (!exists) await minio.makeBucket(bucket);
+      await minio.fPutObject(bucket, output_key, outFile, { "content-type": "video/mp4" });
+      const presigned = await minio.presignedGetObject(bucket, output_key, 7 * 24 * 3600);
+      res.json({ ok: true, path: `minio://${bucket}/${output_key}`, url: presigned });
     }
 
-    // 2. Build ffmpeg concat list
-    const listFile = join(workDir, "list.txt");
-    writeFileSync(listFile, localClips.map(p => `file '${p}'`).join("\n"));
-
-    // 3. Concat with ffmpeg (re-encode for consistent stream)
-    const outFile = join(workDir, "final.mp4");
-    const ffCmd = [
-      "ffmpeg -y",
-      `-f concat -safe 0 -i "${listFile}"`,
-      `-vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2"`,
-      `-c:v libx264 -preset fast -crf 22`,
-      `-c:a aac -b:a 192k`,
-      `-movflags +faststart`,
-      `"${outFile}"`,
-    ].join(" ");
-
-    console.log(`  Running ffmpeg...`);
-    await execAsync(ffCmd, { timeout: 300_000 });
-
-    // 4. Upload to MinIO
-    const bucket = output_bucket;
-    const exists = await minio.bucketExists(bucket);
-    if (!exists) await minio.makeBucket(bucket);
-
-    await minio.fPutObject(bucket, output_key, outFile, { "content-type": "video/mp4" });
-
-    const presigned = await minio.presignedGetObject(bucket, output_key, 7 * 24 * 3600);
-
-    res.json({
-      ok: true,
-      path: `minio://${bucket}/${output_key}`,
-      url: presigned,
-    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: String(err) });
   } finally {
-    // Cleanup temp files
-    for (const f of [...localClips]) {
+    for (const f of tempFiles) {
       try { unlinkSync(f); } catch (_) {}
     }
-    try { unlinkSync(join(workDir, "list.txt")); } catch (_) {}
-    try { unlinkSync(join(workDir, "final.mp4")); } catch (_) {}
   }
 });
 
