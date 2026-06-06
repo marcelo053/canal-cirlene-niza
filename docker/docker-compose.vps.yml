@@ -51,7 +51,7 @@ services:
       CHROME_EXECUTABLE_PATH: /usr/bin/chromium
       REMOTION_CACHE_DIR: /tmp/remotion-cache
     volumes:
-      - ../slides-cientificos:/slides:ro
+      - ../slides-cientificos:/slides
     shm_size: "1gb"
     restart: unless-stopped
 

@@ -6,7 +6,7 @@
 import express from "express";
 import { exec } from "child_process";
 import { promisify } from "util";
-import { createReadStream, unlinkSync } from "fs";
+import { createReadStream, unlinkSync, symlinkSync, existsSync } from "fs";
 import { Client as MinioClient } from "minio";
 import path from "path";
 import { tmpdir } from "os";
@@ -84,6 +84,19 @@ app.post("/render", async (req, res) => {
     res.status(500).json({ error: String(err) });
   }
 });
+
+// ESM resolution: node_modules must be adjacent to render.mjs in /slides
+// Since /slides is a read-only volume, create symlink at /slides/node_modules -> /srv/node_modules
+const slidesNodeModules = path.join(SLIDES_DIR, "node_modules");
+if (!existsSync(slidesNodeModules)) {
+  try {
+    symlinkSync("/srv/node_modules", slidesNodeModules, "dir");
+    console.log(`Symlinked ${slidesNodeModules} -> /srv/node_modules`);
+  } catch (e) {
+    console.warn(`Could not symlink node_modules (read-only?): ${e.message}`);
+    console.warn("render.mjs may fail to resolve @remotion/* imports");
+  }
+}
 
 app.listen(PORT, () => {
   console.log(`Renderer listening on :${PORT}`);
