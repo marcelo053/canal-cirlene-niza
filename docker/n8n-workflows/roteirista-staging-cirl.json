@@ -1,0 +1,51 @@
+{
+  "name": "roteirista-staging-cirl",
+  "nodes": [
+    {
+      "id": "wh-roteirista-001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "roteirista-staging-cirl",
+        "responseMode": "onReceived",
+        "responseData": "noData",
+        "options": {}
+      }
+    },
+    {
+      "id": "code-roteirista-001",
+      "name": "Gerar Roteiro",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// roteirista-cirl — Gera roteiro estruturado por cenas + prompts de avatar em inglês\n// Input: { production_id, topic }\n// Output: { production_id, topic, scenes[], intro_prompt, outro_prompt }\n\nconst https = require('https');\n\nconst MINIMAX_API_KEY = \"sk-cp-VfL7mdXRnwrcaoTwahYjER-M4zE-J3vErRxKyPD8QYKeQDmYwgX_DNl8ZA7HHJQ0EtDteBfhCBncD0nBxBa_mWAyb_8stH4WcQ3iXQ-54BVzTucNv0qZRXU\";\nconst MINIMAX_GROUP_ID = \"2041519126085645203\";\n\nconst body = $input.first().json.body || $input.first().json;\nconst pid   = body.production_id;\nconst topic = body.topic;\n\nif (!topic) throw new Error('topic is required');\n\nconst SYSTEM_PROMPT = `Você é roteirista especializado em conteúdo de nutrição e saúde para short-form video (TikTok/Reels/Shorts).\n\nGere um roteiro para o canal da nutricionista Cirlene Niza sobre o tema fornecido.\n\nREGRAS:\n- Duração total: 45-60 segundos de narração\n- 3 a 5 cenas de conteúdo (slides)\n- Tom: científico mas acessível, direto, confiante\n- Linguagem: português brasileiro simples\n- Fontes: cite revistas científicas reais (NEJM, Lancet, JAMA, Nutrients, etc.)\n\nLAYOUTS DISPONÍVEIS (escolha o mais adequado por cena):\n- StatCard: { layout, stat, description, source, topic }\n- CircleStat: { layout, stat, label, description, source, topic }\n- ComparisonBar: { layout, title, items:[{label,value,max,unit}], source, topic }\n- StudyQuote: { layout, quote, journal, year, finding, topic }\n- BenefitsList: { layout, title, items:[{icon,text}], source, topic }\n- TimelineProgress: { layout, title, steps:[{label,duration,icon}], source, topic }\n- ScientificDefinition: { layout, term, definition, details:[string], source, topic }\n\nFORMATO DE RESPOSTA (JSON puro, sem markdown):\n{\n  \"scenes\": [ ...array de cenas usando os layouts acima... ],\n  \"intro_prompt\": \"...\",\n  \"outro_prompt\": \"...\"\n}\n\nREGRAS para intro_prompt e outro_prompt:\n- OBRIGATÓRIO: escreva SOMENTE em inglês (English only, no exceptions)\n- Descreva visualmente: Brazilian woman nutritionist, 35 years old, dark hair, warm smile, speaking to camera\n- intro_prompt: she talks excitedly to camera about the topic, natural indoor lighting, professional setup\n- outro_prompt: she waves to camera, warm smile, inviting viewers to follow for more health tips\n- NÃO mencione nome próprio\n- Máximo 2 frases por prompt\n- EXEMPLO válido: \"A Brazilian woman nutritionist with dark hair smiles at the camera, speaking confidently about vitamin D deficiency in a bright indoor setting.\"\n- Se escrever em português, a geração de vídeo VAI FALHAR — escreva em inglês`;\n\nfunction minimax(messages) {\n  return new Promise((resolve, reject) => {\n    const payload = JSON.stringify({\n      model: 'MiniMax-Text-01',\n      messages,\n      temperature: 0.7,\n      max_tokens: 2048,\n    });\n    const opts = {\n      hostname: 'api.minimaxi.chat',\n      path: `/v1/text/chatcompletion_v2?GroupId=${MINIMAX_GROUP_ID}`,\n      method: 'POST',\n      headers: {\n        'Authorization': `Bearer ${MINIMAX_API_KEY}`,\n        'Content-Type': 'application/json',\n        'Content-Length': Buffer.byteLength(payload),\n      },\n    };\n    const req = https.request(opts, res => {\n      let data = '';\n      res.on('data', c => data += c);\n      res.on('end', () => {\n        try { resolve(JSON.parse(data)); }\n        catch(e) { resolve({ raw: data }); }\n      });\n    });\n    req.on('error', reject);\n    req.write(payload);\n    req.end();\n  });\n}\n\nconsole.log(`[${pid}] Gerando roteiro para: \"${topic}\"`);\n\nconst resp = await minimax([\n  { role: 'system', content: SYSTEM_PROMPT },\n  { role: 'user', content: `Tema: ${topic}\\nProduction ID: ${pid}` },\n]);\n\nif (resp.raw) throw new Error('MiniMax retornou resposta inválida: ' + resp.raw.slice(0, 200));\nif (resp.base_resp && resp.base_resp.status_code !== 0) {\n  throw new Error('MiniMax error: ' + JSON.stringify(resp.base_resp));\n}\n\nconst text = resp.choices?.[0]?.message?.content || resp.choices?.[0]?.text || '';\nif (!text) throw new Error('MiniMax: resposta vazia. Keys: ' + Object.keys(resp).join(', '));\n\nconsole.log(`[${pid}] Resposta MiniMax (${text.length} chars)`);\n\n// Parse JSON — remove possíveis blocos markdown\nconst jsonText = text.replace(/^```json?\\n?/m, '').replace(/\\n?```$/m, '').trim();\nlet roteiro;\ntry {\n  roteiro = JSON.parse(jsonText);\n} catch(e) {\n  throw new Error('Falha ao parsear JSON do MiniMax: ' + jsonText.slice(0, 300));\n}\n\nif (!roteiro.scenes || !roteiro.scenes.length) throw new Error('MiniMax não gerou scenes');\nif (!roteiro.intro_prompt) throw new Error('MiniMax não gerou intro_prompt');\nif (!roteiro.outro_prompt) throw new Error('MiniMax não gerou outro_prompt');\n\nconsole.log(`[${pid}] Roteiro OK: ${roteiro.scenes.length} cenas`);\n\nreturn [{\n  json: {\n    production_id: pid,\n    topic,\n    scenes: roteiro.scenes,\n    intro_prompt: roteiro.intro_prompt,\n    outro_prompt: roteiro.outro_prompt,\n    scene_count: roteiro.scenes.length,\n  }\n}];"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Gerar Roteiro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
