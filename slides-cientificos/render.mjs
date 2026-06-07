@@ -38,13 +38,13 @@ if (!layout) {
 }
 
 const DURATIONS = {
-  StatCard: 120,
-  CircleStat: 150,
-  ComparisonBar: 150,
-  StudyQuote: 120,
-  BenefitsList: 160,
-  TimelineProgress: 150,
-  ScientificDefinition: 150,
+  StatCard: 90,       // 3s
+  CircleStat: 100,    // 3.3s
+  ComparisonBar: 100, // 3.3s
+  StudyQuote: 90,     // 3s
+  BenefitsList: 110,  // 3.7s
+  TimelineProgress: 100,
+  ScientificDefinition: 100,
 };
 
 const durationInFrames = DURATIONS[layout] || 150;
