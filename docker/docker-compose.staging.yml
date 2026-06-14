@@ -98,3 +98,32 @@ services:
       MINIO_PORT: "9000"
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+
+  # ─── Streamlit Aprovação (:8503) ─────────────────────────────────
+  aprovacao:
+    image: python:3.11-slim
+    container_name: cirlene-aprovacao-staging
+    command: ["sh", "-c", "pip install -q -r /app/requirements.txt && streamlit run /app/aprovacao_cirlene.py"]
+    ports:
+      - "8503:8503"
+    depends_on:
+      minio:
+        condition: service_healthy
+    volumes:
+      - ../src/platform:/app
+    environment:
+      STREAMLIT_SERVER_PORT: "8503"
+      STREAMLIT_SERVER_ADDRESS: "0.0.0.0"
+      STREAMLIT_SERVER_HEADLESS: "true"
+      BASEROW_URL: ${BASEROW_URL:-}
+      BASEROW_TOKEN: ${BASEROW_TOKEN:-}
+      BASEROW_TABLE_PRODUCTIONS: ${BASEROW_TABLE_PRODUCTIONS:-}
+      BASEROW_TABLE_SCENES: ${BASEROW_TABLE_SCENES:-}
+      FIELD_APPROVAL_STATUS: ${FIELD_APPROVAL_STATUS:-}
+      FIELD_APPROVAL_FEEDBACK: ${FIELD_APPROVAL_FEEDBACK:-}
+      FIELD_TITLE: ${FIELD_TITLE:-}
+      FIELD_PRODUCTION_ID: ${FIELD_PRODUCTION_ID:-}
+      FIELD_COST: ${FIELD_COST:-}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
