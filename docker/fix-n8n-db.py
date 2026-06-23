@@ -2,18 +2,35 @@
 """
 fix-n8n-db.py — Patches n8n SQLite DB após import de workflows via API.
 
-Problemas que resolve (n8n 2.x):
-  1. workflow_published_version.publishedVersionId desatualizado após PUT via API
-  2. workflow_history nodes desatualizados (n8n lê nodes do histórico, não de workflow_entity)
-  3. webhook_entity com paths no formato {workflowId}/webhook/{path} em vez de só {path}
-     → NOTE: n8n 2.x registra com esse formato mesmo; os webhooks ficam em
-       /webhook/{workflowId}/webhook/{path} ao invés de /webhook/{path}
+Problemas que resolve (n8n 2.x / 2.23.4):
+
+  1. webhook_entity com paths no formato {workflowId}/{nodeName}/{path} em vez de {path}
+     ROOT CAUSE: n8n usa workflow_history.nodes para ativar. Quando o nó webhook não
+     tem campo "webhookId" (undefined em JS), usa o path longo.
+     FIX: garantir que todos os nós webhook em workflow_history.nodes e
+     workflow_entity.nodes tenham "webhookId": null (não ausente).
+     null != undefined → n8n usa o branch isFullPath=true → path curto.
+
+  2. webhook_entity stale — apaga entradas para forçar re-registro limpo no restart.
 
 Uso:
   cd docker/
-  python3 fix-n8n-db.py
+  docker stop cirlene-n8n
+  python3 fix-n8n-db.py    # roda via --volumes-from ou path direto
+  docker start cirlene-n8n
 
 Pré-requisito: n8n deve estar PARADO (para evitar lock WAL).
+
+Detalhes técnicos do bug n8n 2.23.4:
+  getNodeWebhookPath(workflowId, node, path, isFullPath, restartWebhook):
+    if node.webhookId === undefined:  ← ausente no JSON → undefined em JS
+      return `${workflowId}/${nodeName}/${path}`  ← LONG FORM
+    else:
+      if isFullPath === true:  ← Webhook node sempre tem isFullPath:true
+        return path || node.webhookId  ← SHORT FORM ✓
+
+  Quando webhookId é null (não undefined):
+    node.webhookId === undefined → false → usa isFullPath=true → SHORT FORM ✓
 """
 
 import json
@@ -23,77 +40,54 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
 DB_PATH = SCRIPT_DIR / "data/n8n/database.sqlite"
-WORKFLOWS_DIR = SCRIPT_DIR / "n8n-workflows"
-
-WORKFLOW_MAP = {
-    "gerador-avatar-staging-cirl":    None,  # preenchido abaixo
-    "gerador-slides-staging-cirl":    None,
-    "montagem-staging-cirl":          None,
-    "roteirista-staging-cirl":        None,
-}
 
 
-def load_workflow_ids(db: sqlite3.Connection) -> dict[str, str]:
-    rows = db.execute(
-        "SELECT id, name FROM workflow_entity WHERE name IN ({})".format(
-            ",".join("?" * len(WORKFLOW_MAP))
-        ),
-        list(WORKFLOW_MAP.keys()),
-    ).fetchall()
-    return {name: wf_id for wf_id, name in rows}
+def fix_webhook_nodes_in_json(nodes_json: str) -> tuple[str, bool]:
+    """
+    Garante que todos os nós webhook tenham webhookId: null (não ausente).
+    Retorna (novo_json, houve_mudança).
+    """
+    nodes = json.loads(nodes_json)
+    changed = False
+    for node in nodes:
+        if "webhook" in node.get("type", "").lower():
+            if "webhookId" not in node:
+                node["webhookId"] = None
+                changed = True
+    return json.dumps(nodes, ensure_ascii=False), changed
 
 
-def sync_nodes_to_history(db: sqlite3.Connection, wf_id: str, name: str, nodes_json: str, connections_json: str):
-    """Atualiza workflow_entity e workflow_history com os nodes atuais."""
-    db.execute(
-        "UPDATE workflow_entity SET nodes=?, connections=? WHERE id=?",
-        (nodes_json, connections_json, wf_id),
-    )
+def fix_workflow(db: sqlite3.Connection, wf_id: str, name: str):
+    """Fix workflow_entity.nodes e workflow_history.nodes."""
+    # Fix workflow_entity.nodes
     row = db.execute(
-        "SELECT publishedVersionId FROM workflow_published_version WHERE workflowId=?",
-        (wf_id,),
+        "SELECT nodes FROM workflow_entity WHERE id=?", (wf_id,)
     ).fetchone()
     if row:
-        db.execute(
-            "UPDATE workflow_history SET nodes=?, connections=? WHERE workflowId=? AND versionId=?",
-            (nodes_json, connections_json, wf_id, row[0]),
-        )
-        print(f"  ✓ {name}: nodes synced → history({row[0][:8]})")
-    else:
-        print(f"  ⚠ {name}: sem published version, pulando history sync")
-
-
-def sync_published_version(db: sqlite3.Connection, wf_id: str, name: str):
-    """Garante publishedVersionId == versionId atual do workflow."""
-    row = db.execute(
-        "SELECT versionId FROM workflow_entity WHERE id=?", (wf_id,)
-    ).fetchone()
-    if not row:
-        print(f"  ✗ {name}: workflow não encontrado no DB")
-        return
-
-    version_id = row[0]
-
-    existing = db.execute(
-        "SELECT publishedVersionId FROM workflow_published_version WHERE workflowId=?",
-        (wf_id,),
-    ).fetchone()
-
-    if existing:
-        if existing[0] != version_id:
+        new_nodes, changed = fix_webhook_nodes_in_json(row[0])
+        if changed:
             db.execute(
-                "UPDATE workflow_published_version SET publishedVersionId=? WHERE workflowId=?",
-                (version_id, wf_id),
+                "UPDATE workflow_entity SET nodes=? WHERE id=?",
+                (new_nodes, wf_id),
             )
-            print(f"  ✓ {name}: publishedVersionId atualizado → {version_id[:8]}")
-        else:
-            print(f"  ✓ {name}: publishedVersionId já correto")
-    else:
-        db.execute(
-            "INSERT INTO workflow_published_version (workflowId, publishedVersionId) VALUES (?,?)",
-            (wf_id, version_id),
-        )
-        print(f"  ✓ {name}: published version criada → {version_id[:8]}")
+            print(f"  ✓ {name}: workflow_entity.nodes corrigido")
+
+    # Fix ALL workflow_history.nodes entries
+    hist_rows = db.execute(
+        "SELECT versionId, nodes FROM workflow_history WHERE workflowId=?",
+        (wf_id,),
+    ).fetchall()
+    fixed_count = 0
+    for ver_id, nodes_json in hist_rows:
+        new_nodes, changed = fix_webhook_nodes_in_json(nodes_json)
+        if changed:
+            db.execute(
+                "UPDATE workflow_history SET nodes=? WHERE workflowId=? AND versionId=?",
+                (new_nodes, wf_id, ver_id),
+            )
+            fixed_count += 1
+    if fixed_count:
+        print(f"  ✓ {name}: {fixed_count} workflow_history entrada(s) corrigida(s)")
 
 
 def main():
@@ -105,39 +99,31 @@ def main():
     db = sqlite3.connect(str(DB_PATH))
     db.execute("PRAGMA journal_mode=WAL")
 
-    # Carrega IDs dos workflows
-    id_map = load_workflow_ids(db)
-    if not id_map:
-        print("✗ Nenhum workflow encontrado. Rode setup-workflows.sh primeiro.")
+    # Carrega todos os workflows
+    workflows = db.execute("SELECT id, name FROM workflow_entity").fetchall()
+    if not workflows:
+        print("✗ Nenhum workflow encontrado.")
         sys.exit(1)
 
-    print(f"\nWorkflows encontrados: {len(id_map)}")
+    print(f"\nWorkflows encontrados: {len(workflows)}")
 
-    # Para cada workflow JSON, sincroniza nodes + published version
-    print("\n[1/2] Sincronizando nodes workflow_entity → workflow_history...")
-    for json_file in sorted(WORKFLOWS_DIR.glob("*.json")):
-        wf = json.loads(json_file.read_text())
-        name = wf.get("name", "")
-        wf_id = id_map.get(name)
-        if not wf_id:
-            print(f"  ⚠ {name}: não encontrado no DB, pulando")
-            continue
-        nodes_json = json.dumps(wf["nodes"], ensure_ascii=False)
-        connections_json = json.dumps(wf.get("connections", {}), ensure_ascii=False)
-        sync_nodes_to_history(db, wf_id, name, nodes_json, connections_json)
+    print("\n[1/2] Corrigindo webhookId nos nós webhook (workflow_entity + workflow_history)...")
+    for wf_id, name in workflows:
+        fix_workflow(db, wf_id, name)
 
-    print("\n[2/2] Sincronizando published versions...")
-    for name, wf_id in id_map.items():
-        sync_published_version(db, wf_id, name)
+    print("\n[2/2] Limpando webhook_entity (será re-populado no restart)...")
+    count = db.execute("SELECT COUNT(*) FROM webhook_entity").fetchone()[0]
+    db.execute("DELETE FROM webhook_entity")
+    print(f"  ✓ Removidas {count} entradas de webhook_entity")
 
     db.commit()
     db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     db.commit()
     db.close()
 
-    print("\n✓ DB corrigido. Reinicie o n8n para carregar os webhooks.")
-    print("  Webhooks ficam em: /webhook/{workflowId}/webhook/{path}")
-    print("  Exemplo: POST http://localhost:5679/webhook/TKFJZJviFg45eV0q/webhook/gerador-slides-staging-cirl")
+    print("\n✓ DB corrigido. Reinicie o n8n para registrar os webhooks.")
+    print("  Webhooks ficam em: /webhook/{path}")
+    print("  Ex: POST http://localhost:5678/webhook/gerador-avatar-staging-cirl")
 
 
 if __name__ == "__main__":

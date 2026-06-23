@@ -79,17 +79,19 @@ done
 echo ""
 echo "✓ Workflows importados: ${N8N_URL}/workflows"
 echo ""
-echo "→ Aplicando fix no DB (n8n 2.x published versions)..."
+echo "→ Aplicando fix no DB (n8n 2.23.4 webhook path bug)..."
+# CRITICAL: n8n 2.23.4 uses workflow_history.nodes for activation. If a webhook
+# node lacks the "webhookId" field (undefined in JS), n8n generates long-form
+# path /{workflowId}/{nodeName}/{path} instead of short /{path}.
+# fix-n8n-db.py sets webhookId=null in all webhook nodes (null != undefined),
+# forcing n8n to use isFullPath=true -> short path. Must run with n8n STOPPED.
+docker stop "${N8N_CONTAINER:-cirlene-n8n}" 2>/dev/null || true
+sleep 2
 python3 "${SCRIPT_DIR}/fix-n8n-db.py"
+docker start "${N8N_CONTAINER:-cirlene-n8n}" 2>/dev/null || true
+echo "→ Aguardando n8n reiniciar após fix..."
+sleep 10
 echo ""
-echo "→ Reativando workflows..."
-for ID in $(curl -s "${API}/workflows" -H "X-N8N-API-KEY: ${API_KEY}" | \
-    python3 -c "import sys,json; [print(w['id']) for w in json.load(sys.stdin).get('data',[])]" 2>/dev/null); do
-  curl -s -X POST "${API}/workflows/${ID}/deactivate" -H "X-N8N-API-KEY: ${API_KEY}" > /dev/null
-  sleep 0.5
-  curl -s -X POST "${API}/workflows/${ID}/activate"   -H "X-N8N-API-KEY: ${API_KEY}" > /dev/null
-  echo "   ✓ activated ${ID}"
-done
 echo ""
 echo "✓ Setup completo. Webhooks disponíveis em:"
 curl -s "${API}/workflows" -H "X-N8N-API-KEY: ${API_KEY}" | \
@@ -99,5 +101,5 @@ for w in json.load(sys.stdin).get('data',[]):
     for node in w.get('nodes',[]):
         if node.get('type') == 'n8n-nodes-base.webhook':
             path = node['parameters'].get('path','')
-            print(f'  POST ${N8N_URL}/webhook/{w[\"id\"]}/webhook/{path}')
+            print(f'  POST ${N8N_URL}/webhook/{path}')
 " 2>/dev/null || true

@@ -6,8 +6,7 @@
         "httpMethod": "POST",
         "path": "gerador-slides-staging-cirl",
         "responseMode": "onReceived",
-        "options": {},
-        "responseData": "noData"
+        "options": {}
       },
       "id": "wh-slides-001",
       "name": "Webhook",
@@ -16,7 +15,8 @@
       "position": [
         240,
         300
-      ]
+      ],
+      "webhookId": null
     },
     {
       "parameters": {
@@ -29,8 +29,7 @@
       "position": [
         500,
         300
-      ],
-      "executeOnce": true
+      ]
     }
   ],
   "connections": {
@@ -51,9 +50,7 @@
       ]
     }
   },
-  "active": true,
   "settings": {
-    "executionOrder": "v1",
-    "timeout": 600
+    "executionOrder": "v1"
   }
 }

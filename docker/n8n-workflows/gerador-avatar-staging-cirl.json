@@ -6,8 +6,7 @@
         "httpMethod": "POST",
         "path": "gerador-avatar-staging-cirl",
         "responseMode": "onReceived",
-        "options": {},
-        "responseData": "noData"
+        "options": {}
       },
       "id": "wh-avatar-001",
       "name": "Webhook",
@@ -16,22 +15,22 @@
       "position": [
         240,
         300
-      ]
+      ],
+      "webhookId": null
     },
     {
       "parameters": {
-        "jsCode": "const https = require('https');\nconst http  = require('http');\n\nconst FAL_KEY  = \"443a6432-3b5b-4abe-a925-a6336817f13f:70f93e62dbc7def11558314850ea375c\";\nconst MONTAGEM_HOST = 'montagem';\nconst MONTAGEM_PORT = 3000;\nconst REF_IMGS = [\n  \"https://v3b.fal.media/files/b/0a9d190b/eJgcWqX9t4DJ2Ypx_1InI_IMG_3628.JPG\",\n  \"https://v3b.fal.media/files/b/0a9d190d/MPANCIXNZroF4MEj3lQhq_IMG_3629.JPG\",\n  \"https://v3b.fal.media/files/b/0a9d1911/2agE2ANEpIiKnJWbYge44_IMG_3631.JPG\"\n];\n\nconst body      = $input.first().json.body || $input.first().json;\nconst pid       = body.production_id;\nconst introText = body.intro_prompt;\nconst outroText = body.outro_prompt;\n\nconst sleep = ms => new Promise(r => setTimeout(r, ms));\n\nfunction httpsReq(method, hostname, path, hdrs, payload) {\n  return new Promise((resolve, reject) => {\n    const data = payload ? JSON.stringify(payload) : null;\n    const opts = {\n      hostname, path, method,\n      headers: { ...hdrs, ...(data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {}) }\n    };\n    const req = https.request(opts, res => {\n      let body = '';\n      res.on('data', c => body += c);\n      res.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { resolve({ raw: body }); } });\n    });\n    req.on('error', reject);\n    if (data) req.write(data);\n    req.end();\n  });\n}\n\nfunction httpPost(host, port, path, payload) {\n  return new Promise((resolve, reject) => {\n    const data = JSON.stringify(payload);\n    const opts = {\n      hostname: host, port, path, method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }\n    };\n    const req = http.request(opts, res => {\n      let body = '';\n      res.on('data', c => body += c);\n      res.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { resolve({ raw: body }); } });\n    });\n    req.on('error', reject);\n    req.write(data);\n    req.end();\n  });\n}\n\nconst AUTH = { 'Authorization': `Key ${FAL_KEY}` };\n\nasync function submitFal(prompt) {\n  const r = await httpsReq('POST', 'queue.fal.run', '/fal-ai/veo3.1/reference-to-video', AUTH, {\n    prompt, image_urls: REF_IMGS, aspect_ratio: '9:16', generate_audio: true, resolution: '720p'\n  });\n  if (!r.request_id) throw new Error('fal submit failed: ' + JSON.stringify(r));\n  return r.request_id;\n}\n\nasync function pollFal(requestId) {\n  for (let i = 0; i < 40; i++) {\n    await sleep(15000);\n    const s = await httpsReq('GET', 'queue.fal.run', `/fal-ai/veo3.1/requests/${requestId}/status`, AUTH, null);\n    console.log(`[${pid}] poll ${i+1}: ${s.status}`);\n    if (s.status === 'COMPLETED') {\n      const res = await httpsReq('GET', 'queue.fal.run', `/fal-ai/veo3.1/requests/${requestId}`, AUTH, null);\n      console.log(`[${pid}] result keys: ${Object.keys(res).join(', ')}`);\n      // fal may return video in different fields\n      const videoUrl = res.video?.url || res.videos?.[0]?.url || res.output?.video?.url || res.output?.url;\n      if (!videoUrl) throw new Error('fal completed but no video URL. Keys: ' + Object.keys(res).join(', ') + ' | sample: ' + JSON.stringify(res).slice(0, 300));\n      return videoUrl;\n    }\n    if (s.status === 'FAILED') throw new Error('fal job failed: ' + JSON.stringify(s));\n  }\n  throw new Error('fal polling timeout after 10min');\n}\n\nasync function uploadToMinio(falUrl, bucket, key) {\n  const r = await httpPost(MONTAGEM_HOST, MONTAGEM_PORT, '/upload-from-url', { url: falUrl, bucket, key });\n  if (r.error) throw new Error('upload failed: ' + r.error);\n  return r;\n}\n\n// --- Intro ---\nconsole.log(`[${pid}] Submitting INTRO...`);\nconst introId = await submitFal(introText);\nconsole.log(`[${pid}] INTRO request_id: ${introId}`);\nconst introFalUrl = await pollFal(introId);\nconsole.log(`[${pid}] INTRO url: ${introFalUrl}`);\nconst introResult = await uploadToMinio(introFalUrl, 'cirlene-video', `${pid}/intro.mp4`);\n\n// --- Outro ---\nconsole.log(`[${pid}] Submitting OUTRO...`);\nconst outroId = await submitFal(outroText);\nconsole.log(`[${pid}] OUTRO request_id: ${outroId}`);\nconst outroFalUrl = await pollFal(outroId);\nconsole.log(`[${pid}] OUTRO url: ${outroFalUrl}`);\nconst outroResult = await uploadToMinio(outroFalUrl, 'cirlene-video', `${pid}/outro.mp4`);\n\nreturn [{ json: {\n  production_id: pid,\n  intro_path: introResult.path, intro_url: introResult.url,\n  outro_path: outroResult.path, outro_url: outroResult.url,\n} }];"
+        "mode": "runOnceForAllItems",
+        "jsCode": "// gerador-avatar-cirl — Lip-sync avatar via Seedance 2.0\n// Input: { production_id, intro_prompt, outro_prompt,\n//          intro_audio_public_url, outro_audio_public_url }\n// Output: { production_id, intro_url, outro_url, intro_path, outro_path }\n//\n// Seedance 2.0: accepts image_urls[] + audio_urls[] → lip-synced talking head\n// Audio baked into output video — no separate overlay needed in montagem\n\nconst https = require('https');\nconst http  = require('http');\n\nlet FAL_KEY = \"443a6432-3b5b-4abe-a925-a6336817f13f:70f93e62dbc7def11558314850ea375c\";\ntry { if ($env.FAL_KEY) FAL_KEY = $env.FAL_KEY; } catch(e) {}\nconst MONTAGEM_HOST = 'montagem';\nconst MONTAGEM_PORT = 3000;\n\n// Cirlene reference images (uploaded to fal CDN)\nconst REF_IMGS = [\n  \"https://v3b.fal.media/files/b/0a9d190b/eJgcWqX9t4DJ2Ypx_1InI_IMG_3628.JPG\",\n  \"https://v3b.fal.media/files/b/0a9d190d/MPANCIXNZroF4MEj3lQhq_IMG_3629.JPG\",\n  \"https://v3b.fal.media/files/b/0a9d1911/2agE2ANEpIiKnJWbYge44_IMG_3631.JPG\"\n];\n\nconst body              = $input.first().json.body || $input.first().json;\nconst pid               = body.production_id;\nconst introPrompt       = body.intro_prompt;\nconst outroPrompt       = body.outro_prompt;\nconst introAudioUrl     = body.intro_audio_public_url;  // public MinIO URL accessible by fal.ai\nconst outroAudioUrl     = body.outro_audio_public_url;\n\nif (!pid) throw new Error('production_id required');\nif (!introAudioUrl) throw new Error('intro_audio_public_url required (run narracao first)');\nif (!outroAudioUrl) throw new Error('outro_audio_public_url required (run narracao first)');\n\nconst sleep = ms => new Promise(r => setTimeout(r, ms));\nconst AUTH  = { 'Authorization': `Key ${FAL_KEY}` };\n\nconst MODEL      = 'bytedance/seedance-2.0/reference-to-video';\nconst FAL_HOST   = 'queue.fal.run';\n\nfunction httpsReq(method, hostname, path, hdrs, payload) {\n  return new Promise((resolve, reject) => {\n    const data = payload ? JSON.stringify(payload) : null;\n    const opts = {\n      hostname, path, method,\n      headers: { ...hdrs, ...(data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {}) }\n    };\n    const req = https.request(opts, res => {\n      let body = '';\n      res.on('data', c => body += c);\n      res.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { resolve({ raw: body, status: res.statusCode }); } });\n    });\n    req.on('error', reject);\n    if (data) req.write(data);\n    req.end();\n  });\n}\n\nfunction httpPost(host, port, path, payload) {\n  return new Promise((resolve, reject) => {\n    const data = JSON.stringify(payload);\n    const opts = {\n      hostname: host, port, path, method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }\n    };\n    const req = http.request(opts, res => {\n      let body = '';\n      res.on('data', c => body += c);\n      res.on('end', () => { try { resolve(JSON.parse(body)); } catch(e) { resolve({ raw: body }); } });\n    });\n    req.on('error', reject);\n    req.write(data);\n    req.end();\n  });\n}\n\nasync function submitSeedance(prompt, audioUrl) {\n  const r = await httpsReq('POST', FAL_HOST, `/${MODEL}`, AUTH, {\n    prompt,\n    image_urls: REF_IMGS,\n    audio_urls: [audioUrl],\n    duration: 'auto',\n    aspect_ratio: '9:16',\n    resolution: '720p'\n  });\n  if (!r.request_id) throw new Error(`Seedance submit failed: ${JSON.stringify(r).slice(0,300)}`);\n  return r.request_id;\n}\n\nasync function pollSeedance(requestId, label) {\n  for (let i = 0; i < 60; i++) {  // up to 15 min\n    await sleep(15000);\n    const s = await httpsReq('GET', FAL_HOST, `/${MODEL}/requests/${requestId}/status`, AUTH, null);\n    console.log(`[${pid}] ${label} poll ${i+1}: ${s.status}`);\n    if (s.status === 'COMPLETED') {\n      const res = await httpsReq('GET', FAL_HOST, `/${MODEL}/requests/${requestId}`, AUTH, null);\n      console.log(`[${pid}] ${label} result keys: ${Object.keys(res).join(', ')}`);\n      const videoUrl = res.video?.url || res.videos?.[0]?.url || res.output?.video?.url || res.output?.url;\n      if (!videoUrl) throw new Error(`Seedance completed but no video URL. keys: ${Object.keys(res).join(',')} sample: ${JSON.stringify(res).slice(0,300)}`);\n      return videoUrl;\n    }\n    if (s.status === 'FAILED') throw new Error(`Seedance ${label} failed: ${JSON.stringify(s)}`);\n  }\n  throw new Error(`Seedance ${label} polling timeout after 15min`);\n}\n\nasync function uploadToMinio(falUrl, bucket, key) {\n  const r = await httpPost(MONTAGEM_HOST, MONTAGEM_PORT, '/upload-from-url', { url: falUrl, bucket, key });\n  if (r.error) throw new Error('upload failed: ' + r.error);\n  return r;\n}\n\n// Submit INTRO and OUTRO in parallel (saves ~8 min vs sequential)\nconsole.log(`[${pid}] Submitting INTRO + OUTRO to Seedance 2.0...`);\nconst [introId, outroId] = await Promise.all([\n  submitSeedance(introPrompt, introAudioUrl),\n  submitSeedance(outroPrompt, outroAudioUrl)\n]);\nconsole.log(`[${pid}] INTRO id: ${introId}`);\nconsole.log(`[${pid}] OUTRO id: ${outroId}`);\n\n// Poll both in parallel\nconst [introFalUrl, outroFalUrl] = await Promise.all([\n  pollSeedance(introId, 'INTRO'),\n  pollSeedance(outroId, 'OUTRO')\n]);\nconsole.log(`[${pid}] INTRO fal url: ${introFalUrl}`);\nconsole.log(`[${pid}] OUTRO fal url: ${outroFalUrl}`);\n\n// Upload both to MinIO\nconst [introResult, outroResult] = await Promise.all([\n  uploadToMinio(introFalUrl, 'cirlene-video', `${pid}/intro.mp4`),\n  uploadToMinio(outroFalUrl, 'cirlene-video', `${pid}/outro.mp4`)\n]);\n\nconsole.log(`[${pid}] Avatar done: intro=${introResult.path} outro=${outroResult.path}`);\n\nreturn [{ json: {\n  production_id: pid,\n  intro_path: introResult.path, intro_url: introResult.url,\n  outro_path: outroResult.path, outro_url: outroResult.url,\n} }];"
       },
       "id": "code-avatar-001",
-      "name": "Gerar Avatar (intro + outro)",
+      "name": "Gerar Avatar Seedance (intro + outro)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
         500,
         300
-      ],
-      "executeOnce": true,
-      "executeData": {}
+      ]
     }
   ],
   "connections": {
@@ -39,22 +38,20 @@
       "main": [
         [
           {
-            "node": "Gerar Avatar (intro + outro)",
+            "node": "Gerar Avatar Seedance (intro + outro)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Gerar Avatar (intro + outro)": {
+    "Gerar Avatar Seedance (intro + outro)": {
       "main": [
         []
       ]
     }
   },
-  "active": true,
   "settings": {
-    "executionOrder": "v1",
-    "timeout": 600
+    "executionOrder": "v1"
   }
 }

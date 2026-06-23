@@ -103,20 +103,20 @@ app.post("/concat", async (req, res) => {
           await download(seg.audio, audioPath);
           tempFiles.push(audioPath);
 
-          // ffmpeg: overlay audio, optionally mute original video audio
+          // ffmpeg: overlay TTS audio, extend slide video to match full audio duration
+          // tpad=stop_mode=clone freezes last frame so TTS isn't cut short by short slide
+          // -shortest stops at audio end (which is now the shorter stream)
           const mixedPath = join(workDir, `seg-${i}-mixed.mp4`);
           tempFiles.push(mixedPath);
 
-          // Both cases: replace/add TTS audio, discard original video audio
-          // -filter_complex pads TTS to video length; -map picks video + padded audio
           const ffCmd = [
             "ffmpeg -y",
             `-i "${videoPath}"`,
             `-i "${audioPath}"`,
-            `-filter_complex "[1:a]apad[aout]"`,
-            `-map 0:v -map "[aout]"`,
-            `-c:v copy`,
-            `-c:a aac -b:a 192k`,
+            `-filter_complex "[0:v]tpad=stop_mode=clone:stop_duration=60,fps=24,scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black[v];[1:a]aresample=48000,aformat=channel_layouts=stereo[aout]"`,
+            `-map "[v]" -map "[aout]"`,
+            `-c:v libx264 -preset fast -crf 22`,
+            `-c:a aac -ar 48000 -ac 2 -b:a 192k`,
             `-shortest`,
             `-movflags +faststart`,
             `"${mixedPath}"`,
@@ -124,21 +124,24 @@ app.post("/concat", async (req, res) => {
           await execAsync(ffCmd, { timeout: 120_000 });
           segFiles.push(mixedPath);
         } else {
-          // No audio override — use video as-is (re-encode to ensure consistent streams)
+          // No audio override — normalize to 24fps 1080x1920 + keep/normalize audio
           const normPath = join(workDir, `seg-${i}-norm.mp4`);
           tempFiles.push(normPath);
           const ffCmd = [
             "ffmpeg -y",
             `-i "${videoPath}"`,
-            `-an -c:v copy`,
+            `-vf "fps=24,scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black"`,
+            `-c:v libx264 -preset fast -crf 22`,
+            `-c:a aac -ar 48000 -ac 2 -b:a 192k`,
+            `-movflags +faststart`,
             `"${normPath}"`,
           ].join(" ");
-          await execAsync(ffCmd, { timeout: 60_000 });
+          await execAsync(ffCmd, { timeout: 120_000 });
           segFiles.push(normPath);
         }
       }
 
-      // 2. Concat all processed segments
+      // 2. Concat all pre-normalized segments (same fps/codec/audio — safe to copy)
       const listFile = join(workDir, "list.txt");
       writeFileSync(listFile, segFiles.map(p => `file '${p}'`).join("\n"));
       tempFiles.push(listFile);
@@ -148,9 +151,8 @@ app.post("/concat", async (req, res) => {
       const concatCmd = [
         "ffmpeg -y",
         `-f concat -safe 0 -i "${listFile}"`,
-        `-vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black"`,
-        `-c:v libx264 -preset fast -crf 22`,
-        `-c:a aac -b:a 192k`,
+        `-c:v copy`,
+        `-c:a copy`,
         `-movflags +faststart`,
         `"${outFile}"`,
       ].join(" ");
