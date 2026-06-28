@@ -164,8 +164,8 @@ def _render_slide_gallery(production_pid: str) -> None:
             return
         cols = st.columns(min(len(objects), 3))
         for i, obj in enumerate(objects):
-            url = client.presigned_get_object("cirlene-slides", obj.object_name,
-                                              expires=datetime.timedelta(hours=2))
+            # URL pública direta (bucket anônimo download) — evita CORS de presigned
+            url = f"{MINIO_ENDPOINT}/cirlene-slides/{obj.object_name}"
             with cols[i % 3]:
                 st.video(url)
                 st.caption(obj.object_name.split("/")[-1])
@@ -253,10 +253,9 @@ def _render_production_gate3(prod: dict) -> None:
     age = _age(created) if created else "?"
 
     with st.expander(f"🎬 {title}  |  {age}  |  ~${float(cost or 0):.2f}  |  #{row_id}", expanded=True):
-        # Show final video from MinIO
-        video_path = f"minio://cirlene-video/{production_pid}/final.mp4" if production_pid else ""
-        video_url = _presigned(video_path) if video_path else None
-        if video_url:
+        # Show final video from MinIO (URL pública direta — bucket anônimo)
+        if production_pid:
+            video_url = f"{MINIO_ENDPOINT}/cirlene-video/{production_pid}/final.mp4"
             st.video(video_url)
         else:
             st.info("Vídeo final ainda não disponível ou production_id não configurado.")
