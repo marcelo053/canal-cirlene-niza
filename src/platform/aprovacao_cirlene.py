@@ -37,6 +37,7 @@ FIELD_APPROVAL_STATUS = os.environ.get("FIELD_APPROVAL_STATUS", "")
 FIELD_APPROVAL_FEEDBACK = os.environ.get("FIELD_APPROVAL_FEEDBACK", "")
 FIELD_TITLE = os.environ.get("FIELD_TITLE", "")
 FIELD_PRODUCTION_ID = os.environ.get("FIELD_PRODUCTION_ID", "")
+FIELD_SCENE_PRODUCTION_ID = os.environ.get("FIELD_SCENE_PRODUCTION_ID", "2993")
 FIELD_COST = os.environ.get("FIELD_COST", "")
 
 _CONFIGURED = all([BASEROW_URL, BASEROW_TOKEN, TABLE_PRODUCTIONS, TABLE_SCENES,
@@ -85,11 +86,10 @@ def _list_pending(status_value: str) -> list[dict]:
 
 def _scenes_for(production_id: str) -> list[dict]:
     """List scenes linked to a production_id value."""
-    if not TABLE_SCENES or not FIELD_PRODUCTION_ID:
+    if not TABLE_SCENES or not FIELD_SCENE_PRODUCTION_ID:
         return []
     return _list_rows(TABLE_SCENES, {
-        f"filter__field_{FIELD_PRODUCTION_ID}__equal": production_id,
-        "order_by": f"field_{FIELD_PRODUCTION_ID}",
+        f"filter__field_{FIELD_SCENE_PRODUCTION_ID}__equal": production_id,
     })
 
 
